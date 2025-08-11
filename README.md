@@ -9,4 +9,28 @@ The goal of this project is to integrate these datasets and models with the broa
 1. Integrate the Lacuna+ labels with the existing FTW labels.
 2. Train and evaluate models using various combinations the integrated datasets. Models will include the existing Mapping Africa U-Net as well as FTW's U-Net variant, and potentially others.
 
+## Set-up
+
+We require `ftw-tools` to be installed (currently part of [ftw-baselines](https://github.com/fieldsoftheworld/ftw-baselines?tab=readme-ov-file#download-the-ftw-baseline-dataset)), which requires python 3.10-3.12. Using `pyenv` to manage and set up the environment:
+
+```bash
+pyenv install -v 3.12.10
+pyenv virtualenv 3.12.10 ftw-mapafrica
+pyenv activate ftw-mapafrica
+python -m pip install --upgrade pip
+```
+
+And then run `pip install -r requirements.txt` to install the package in editable mode.
+
+### Datasets
+We'll get the Lacuna+ labels from our own HPC storage, and the FTW dataset using the FTW cli. 
+
+```bash
+ftw download 
+ftw data download -o ~/data/labels/cropland/
+```
+
+
+
+
 

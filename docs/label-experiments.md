@@ -38,9 +38,9 @@ Additional variants might include:
 - Using temporal features instead of a second time point, e.g. NDVI
   amplitudes
 
-- Not on images, but variants of labels themselves, using either the
-  U-Nets themselves or something like Delineate-Anything to improve
-  Lacuna labels.
+Lacuna labels have been resized to 256x256 to match existing FTW
+dimensions, and will be normalized using local across band based on
+prior experiments.
 
 ## Experiments
 
@@ -64,15 +64,19 @@ Proposed countries:
 - South Africa
 - Tanzania
 
-This gives then three general sets of test labels: - FTW region-wide -
-Lacuna+ region-wide - Lacuna+ specific countries
+This gives then three general sets of test labels:
+
+- FTW region-wide
+- Lacuna+ region-wide
+- Lacuna+ specific countries
 
 ### Design
 
 #### Models
 
 - FTW’s baseline (U-Net with EfficientNet backbone)
-- Torchgeo-based U-Net closest to Khallaghi et al (2025) variant
+- Torchgeo-based U-Net closest to [Khallaghi et al
+  (2025)](https://www.mdpi.com/2072-4292/17/3/474) variant
 
 #### Experiments
 
@@ -85,5 +89,5 @@ Lacuna+ region-wide - Lacuna+ specific countries
 - FTW + Lacuna -\> FTW countries
 - FTW + Lacuna -\> Lacuna countries
 
-These general experiments to be repeated for the key datasets listed in
-<a href="#tbl-labelsets" class="quarto-xref">Table 1</a>.
+These general experiments (16-20) to be repeated for the key datasets
+listed in <a href="#tbl-labelsets" class="quarto-xref">Table 1</a>.
