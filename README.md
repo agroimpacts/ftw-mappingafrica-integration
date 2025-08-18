@@ -20,7 +20,7 @@ pyenv activate ftw-mapafrica
 python -m pip install --upgrade pip
 ```
 
-And then run `pip install -r requirements.txt` to install the package in editable mode.
+And then run `pip install -e .` to install the package in editable mode.
 
 ### Datasets
 We'll get the Lacuna+ labels from our own HPC storage, and the FTW dataset using the FTW cli. 
@@ -30,6 +30,7 @@ ftw download
 ftw data download -o ~/data/labels/cropland/
 ```
 
+These will be handled by a dataset class and data module based on FTW's as well as modifications from `torchgeo`. 
 
 
 
