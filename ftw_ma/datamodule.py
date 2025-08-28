@@ -39,17 +39,12 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
 
         # self.temporal_options = temporal_options
         # self.num_samples = num_samples
+        # Only include RandomGamma if normalization_strategy is 'min_max'
+        normalization_strategy = kwargs.get("normalization_strategy", None)
         available_augs = {
             "rotation": K.RandomRotation(p=0.5, degrees=90),
             "hflip": K.RandomHorizontalFlip(p=0.5),
             "vflip": K.RandomVerticalFlip(p=0.5),
-            "sharpness": K.RandomSharpness(p=0.5),
-            "gaussian_noise": K.RandomGaussianNoise(
-                mean=0.0, std=(0.03, 0.07), p=0.25
-            ),
-            "gamma": K.RandomGamma(gamma=(0.2, 2.0), p=0.25),
-            "brightness": K.RandomBrightness(brightness=(0.98, 1.02), p=0.25),
-            "contrast": K.RandomContrast(contrast=(0.9, 1.2), p=0.25),
             "rescale": K.RandomResizedCrop(
                 size=(256, 256),
                 scale=(0.75, 1.5),
@@ -58,17 +53,46 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
                 p=0.5,
             ),
             "satslidemix": SatSlideMix(p=0.5),
+            "sharpness": K.RandomSharpness(p=0.5),
+            "gaussian_noise": K.RandomGaussianNoise(
+                mean=0.0, std=0.05, p=0.25
+            ),
+            "brightness": K.RandomBrightness(brightness=(0.98, 1.02), p=0.25),
+            "contrast": K.RandomContrast(contrast=(0.9, 1.2), p=0.25),
         }
+        if normalization_strategy == "min_max":
+            available_augs["gamma"] = K.RandomGamma(gamma=(0.2, 2.0), p=0.25)
+
+        # Define geometric and photometric augmentation names
+        geometric_augs = ["rotation", "hflip", "vflip", "rescale", 
+                          "satslidemix"]
+        photometric_augs = ["sharpness", "brightness", "contrast", 
+                            "gaussian_noise"]
 
         if aug_list is None:
             aug_list = list(available_augs.keys())
-        selected_augs = [
-            available_augs[name] for name in aug_list if name in available_augs
-        ]
+        
+        if "gamma" in aug_list and normalization_strategy != "min_max":
+            print(f"Warning: 'gamma' augmentation requires 'min_max'" \
+                  f"normalization. Skipping 'gamma'.")
+            
+        # Build selected_augs in the desired order
+        selected_augs = []
+        # Add geometric augmentations first
+        selected_augs += [available_augs[name] for name in geometric_augs 
+                          if name in aug_list and name in available_augs]
+
+        # Add gamma if present
+        if "gamma" in aug_list and "gamma" in available_augs and \
+            normalization_strategy == "min_max":
+            selected_augs.append(available_augs["gamma"])
+        
+        # Add photometric augmentations
+        selected_augs += [available_augs[name] for name in photometric_augs 
+                          if name in aug_list and name in available_augs]
+        # print(selected_augs)
+
         self.train_aug = K.AugmentationSequential(
-            # K.RandomRotation(p=0.5, degrees=90),
-            # K.RandomHorizontalFlip(p=0.5),
-            # K.RandomVerticalFlip(p=0.5),
             *selected_augs, 
             data_keys=None,
             keepdim=True,
