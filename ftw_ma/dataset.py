@@ -51,7 +51,7 @@ class FTWMapAfrica(NonGeoDataset):
             nodata (list): List of nodata values.
             transforms (callable): Augmentation/transformation pipeline.
         """
-        self.data = pd.read_csv(catalog).query(f"usage == '{split}'")
+        self.data = pd.read_csv(catalog).query(f"split == '{split}'")
         self.data_dir = data_dir
         self.temporal_options = temporal_options
         self.num_samples = num_samples
@@ -66,10 +66,10 @@ class FTWMapAfrica(NonGeoDataset):
 
         for idx, row in self.data.iterrows():
             all_filenames.append({
-                "window_a": Path(self.data_dir) / "imagery" / row['window_a'],
-                "window_b": Path(self.data_dir) / "imagery" /  row['window_b'] \
+                "window_a": Path(self.data_dir) / row['window_a'],
+                "window_b": Path(self.data_dir) / row['window_b'] \
                     if "windowB" in self.temporal_options else None,
-                "mask": Path(self.data_dir) / "labels" / row['label']
+                "mask": Path(self.data_dir) / row['mask']
             })
 
         if self.num_samples == -1:  # select all samples
@@ -143,12 +143,14 @@ class FTWMapAfrica(NonGeoDataset):
 
         return sample
     
-    def plot(self, sample: dict[str, Tensor], 
+    def plot(self, sample: dict[str, Tensor],
+             bands: Optional[list] = [0, 1, 2], 
              suptitle: Optional[str] = None) -> Figure:
         """Plot a sample from the dataset.
 
         Args:
             sample: a sample return by :meth:`__getitem__`
+            bands: which bands to use for RGB rendering
             suptitle: optional suptitle to use for figure
 
         Returns:
@@ -186,7 +188,7 @@ class FTWMapAfrica(NonGeoDataset):
         # If only one image (3 or 4 bands), show image and mask
         # still missing logic to reshape images depending on if FTW or Lacuna
         if image.shape[0] <= 4:
-            img = image[[2,1,0]].numpy().transpose(1, 2, 0)
+            img = image[bands].numpy().transpose(1, 2, 0)
             num_panels = 2
             fig, axs = plt.subplots(nrows=1, ncols=num_panels, 
                                     figsize=(num_panels * 5, 8))
