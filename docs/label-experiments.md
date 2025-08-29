@@ -53,22 +53,29 @@ e.g. from Austria:
 
 And from Lacuna labels we can use the existing splits from our catalog
 (typically higher quality labels across the full set of countries). We
-will create two test sets for countries were final models will be
+will create two test sets for countries where final models will be
 assessed at scale, with the second set used for focused in-country
 evaluation.
 
-Proposed countries:
+- Proposed Lacuna+ countries:
 
-- Zambia
-- Ghana
-- South Africa
-- Tanzania
+  - Zambia
+  - Ghana
+  - South Africa
+  - Tanzania
+
+- FTW countries:
+
+  - Slovenia
+  - France
+  - South Africa
 
 This gives then three general sets of test labels:
 
 - FTW region-wide
 - Lacuna+ region-wide
 - Lacuna+ specific countries
+- FTW validation countries
 
 ### Design
 
@@ -80,14 +87,23 @@ This gives then three general sets of test labels:
 
 #### Experiments
 
-- FTW -\> Lacuna region-wide
-- Lacuna -\> FTW region-wide
-- FTW + Lacuna -\> FTW region-wide
-- FTW + Lacuna -\> Lacuna region-wide
-- FTW -\> Lacuna countries
-- Lacuna -\> FTW countries
-- FTW + Lacuna -\> FTW countries
-- FTW + Lacuna -\> Lacuna countries
+| Train         | Finetune          | Evaluate          |
+|---------------|-------------------|-------------------|
+| FTW           |                   | Lacuna+ test      |
+| FTW           | Lacuna+           | Lacuna+ test      |
+| Lacuna+       |                   | FTW test          |
+| Lacuna+       | FTW               | FTW test          |
+| FTW + Lacuna+ |                   | FTW test          |
+| FTW + Lacuna+ | FTW               | FTW test          |
+| FTW + Lacuna+ |                   | Lacuna+           |
+| FTW + Lacuna+ | Lacuna+           | Lacuna+           |
+| FTW + Lacuna+ |                   | FTW countries     |
+| FTW + Lacuna+ | FTW countries     | FTW countries     |
+| FTW + Lacuna+ |                   | Lacuna+ countries |
+| FTW + Lacuna+ | Lacuna+ countries | Lacuna+ countries |
 
-These general experiments (16-20) to be repeated for the key datasets
-listed in <a href="#tbl-labelsets" class="quarto-xref">Table 1</a>.
+List of proposed experiments. Experiments without a fine-tuning set
+represent direct transfers to the evaluation dataset {#tbl-experiments}.
+
+These general experiments to be repeated for the key datasets listed in
+<a href="#tbl-labelsets" class="quarto-xref">Table 1</a>.

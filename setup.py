@@ -10,7 +10,7 @@ setup(
     packages=find_packages(), #(where="ftw_ma"),
     include_package_data=True,
     install_requires=[
-        "ftw-tools",
+        "ftw-tools==1.4.3",
         "ipykernel",
         "leafmap",
         "localtileserver",
@@ -18,6 +18,7 @@ setup(
         "scikit-learn",
         "torchgeo",
         # "pyarrow",  # Uncomment if needed
+        "geodatasets",
         "makelabels @ git+https://github.com/agroimpacts/lacunalabels.git",
         "instancemaker @ git+https://github.com/agroimpacts/instancemaker.git",
         "torchgeo @ git+https://github.com/microsoft/torchgeo.git"
