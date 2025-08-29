@@ -87,6 +87,11 @@ This gives then three general sets of test labels:
 
 #### Experiments
 
+<div id="tbl-experiments">
+
+Table 2: List of proposed experiments. Experiments without a fine-tuning
+set represent direct transfers to the evaluation dataset.
+
 | Train         | Finetune          | Evaluate          |
 |---------------|-------------------|-------------------|
 | FTW           |                   | Lacuna+ test      |
@@ -102,8 +107,7 @@ This gives then three general sets of test labels:
 | FTW + Lacuna+ |                   | Lacuna+ countries |
 | FTW + Lacuna+ | Lacuna+ countries | Lacuna+ countries |
 
-List of proposed experiments. Experiments without a fine-tuning set
-represent direct transfers to the evaluation dataset {#tbl-experiments}.
+</div>
 
 These general experiments to be repeated for the key datasets listed in
 <a href="#tbl-labelsets" class="quarto-xref">Table 1</a>.
