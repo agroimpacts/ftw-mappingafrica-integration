@@ -35,43 +35,21 @@ The Mapping Africa/Lacuna+ (hereafter MA) labels were resampled to 256x256. The 
 
 A unified [CSV catalog](data/ftw-mappingafrica-combined-catalog.csv) was created that provides the following information:
 
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Variable       | Description                                                                                                                                                                               |
-+================+===========================================================================================================================================================================================+
-| name           | FTW AOI ID and Lacuna+ grid identifier                                                                                                                                                    |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| dataset        | ftw or mappingafrica                                                                                                                                                                      |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| version        | -   1.0 for FTW                                                                                                                                                                           |
-|                |                                                                                                                                                                                           |
-|                | -   1.3.0 for labels collected under other Mapping Africa projects                                                                                                                        |
-|                |                                                                                                                                                                                           |
-|                | -   2.0.0 for labels from Lacuna Fund project                                                                                                                                             |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| country        | Full names for FTW, abbreviations for MA                                                                                                                                                  |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| x              | Longitude in decimal degrees                                                                                                                                                              |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| y              | Latitude in decimal degrees                                                                                                                                                               |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| fld_prop       | Proportion of image covered by field classes (interior + edge)                                                                                                                            |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| nonfld_prop    | Proportion of image covered by non-field/background class                                                                                                                                 |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| null_prop      | Proportion of image covered by unknown (3) class (FTW only)                                                                                                                               |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| window_a       | Partial path and name for Image collected during the local dry season/end of season time period under the FTW scheme. This is the only time image time point available at present for MA. |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| window_b       | Path and name of early growing season image for FTW, not available for MA.                                                                                                                |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| mask           | Path and name of 3-class mask.                                                                                                                                                            |
-|                |                                                                                                                                                                                           |
-|                | -   For FTW, the mask filename (as with image names) is formed from the AOI ID.                                                                                                           |
-|                |                                                                                                                                                                                           |
-|                | -   For MA, the mask file name consists of \<name\>*\<assignment*\_id\>*\<year\>-\<month\>.* The year and month are the same as those for the window_a image.                             |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| split          | train, validate, or test                                                                                                                                                                  |
-+----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Variable    | Description                                                                                                                                                                                                                   |
+|-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| name        | FTW AOI ID and Lacuna+ grid identifier                                                                                                                                                                                        |
+| dataset     | ftw or mappingafrica                                                                                                                                                                                                          |
+| version     | 1.0 for FTW; 1.3.0 for labels collected under other Mapping Africa projects; 2.0.0 for labels from Lacuna Fund project                                                                                                        |
+| country     | Full names for FTW, abbreviations for MA                                                                                                                                                                                      |
+| x           | Longitude in decimal degrees                                                                                                                                                                                                  |
+| y           | Latitude in decimal degrees                                                                                                                                                                                                   |
+| fld_prop    | Proportion of image covered by field classes (interior + edge)                                                                                                                          |
+| nonfld_prop | Proportion of image covered by non-field/background class                                                                                                                               |
+| null_prop   | Proportion of image covered by unknown (3) class (FTW only)                                                                                                                             |
+| window_a    | Partial path and name for image collected during the local dry season/end of season time period under the FTW scheme. This is the only time image time point available at present for MA.                                     |
+| window_b    | Path and name of early growing season image for FTW, not available for MA.                                                                                                              |
+| mask        | Path and name of 3-class mask. For FTW, the mask filename (as with image names) is formed from the AOI ID. For MA, the mask file name consists of `<name>*<assignment_id>*<year>-<month>.*` (year/month match window_a image). |
+| split       | train, validate, or test                                                                                                                                                                                                      |
 
 The image and mask names have partial paths to each that provide the respective sub-folder structures particular to each dataset, i.e.:
 
