@@ -6,3 +6,5 @@ This package contains modules for loading, augmenting, and processing field boun
 from .dataset import *
 from .datamodule import *
 from .utils import *
+from .losses import *
+from .trainers import *
