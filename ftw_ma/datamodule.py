@@ -97,10 +97,10 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
             data_keys=None,
             keepdim=True,
         )
-        self.aug = None
+        # self.aug = None
         # self.batch_size = batch_size
         # self.num_workers = num_workers
-        # self.kwargs = kwargs
+        self.kwargs = kwargs
 
     def setup(self, stage: str):
         """
@@ -116,11 +116,12 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
                 **self.kwargs,
             )
         if stage in ["fit", "validate"]:
+        # if stage == "validate":
             self.val_dataset = FTWMapAfrica(
                 split="validate",
                 # temporal_options=self.temporal_options,
                 # num_samples=self.num_samples,
-                # transforms=None,
+                transforms=None,
                 **self.kwargs,
             )
         if stage == "test":
@@ -128,6 +129,7 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
                 split="test",
                 # temporal_options=self.temporal_options,
                 # num_samples=self.num_samples,
+                transforms=self.aug,
                 **self.kwargs,
             )
 
