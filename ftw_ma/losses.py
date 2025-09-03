@@ -94,7 +94,8 @@ class TverskyFocalLoss(nn.Module):
 
         elif len(predict.shape) == 4:
             valid = (target != self.ignore_index)
-            safe_target = target.masked_fill(~valid, 0)
+            # safe_target = target.masked_fill(~valid, 0)
+            safe_target = _as_long_index(target.masked_fill(~valid, 0))
             target_oh = (F.one_hot(safe_target, num_classes=nclass)
                          .permute(0, 3, 1, 2)
                          .contiguous())
