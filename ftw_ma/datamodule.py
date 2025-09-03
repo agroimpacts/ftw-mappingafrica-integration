@@ -50,7 +50,7 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
                 scale=(0.75, 1.5),
                 ratio=(1.0, 1.0),
                 cropping_mode="slice",
-                p=0.5,
+                p=0.5
             ),
             "satslidemix": SatSlideMix(p=0.5),
             "sharpness": K.RandomSharpness(p=0.5),
