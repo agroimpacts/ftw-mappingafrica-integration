@@ -160,7 +160,6 @@ class LocallyWeightedTverskyFocalLoss(nn.Module):
         self.ignore_index = ignore_index
 
     def calculate_weights(self, target, num_class):
-        import torch
 
         # Coerce to tensor if needed
         if not isinstance(target, torch.Tensor):
