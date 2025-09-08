@@ -1,5 +1,5 @@
 # FTWMapAfricaDataModule forr managing data loading and augmentation
-import torch
+import warnings
 import kornia.augmentation as K
 from torchgeo.transforms import SatSlideMix
 from torchgeo.datamodules import NonGeoDataModule
@@ -42,7 +42,8 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         # Only include RandomGamma if normalization_strategy is 'min_max'
         normalization_strategy = kwargs.get("normalization_strategy", None)
         available_augs = {
-            "rotation": K.RandomRotation(p=0.5, degrees=90),
+            # "rotation": K.RandomRotation(p=0.5, degrees=90),
+            "rotation": K.RandomRotation(p=0.5, degrees=(90, 90)),
             "hflip": K.RandomHorizontalFlip(p=0.5),
             "vflip": K.RandomVerticalFlip(p=0.5),
             "rescale": K.RandomResizedCrop(
@@ -62,7 +63,7 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         }
         if normalization_strategy == "min_max":
             available_augs["gamma"] = K.RandomGamma(gamma=(0.2, 2.0), p=0.25)
-
+        
         # Define geometric and photometric augmentation names
         geometric_augs = ["rotation", "hflip", "vflip", "rescale", 
                           "satslidemix"]
