@@ -23,4 +23,9 @@ setup(
         "instancemaker @ git+https://github.com/agroimpacts/instancemaker.git",
         "torchgeo @ git+https://github.com/microsoft/torchgeo.git"
     ],
+    entry_points={
+        "console_scripts": [
+            "ftw_ma=ftw_ma.cli:ftw_ma",
+        ],
+    },
 )

@@ -90,20 +90,31 @@ class TverskyFocalLoss(nn.Module):
         nclass = predict.shape[1]
         if predict.shape == target.shape:
             target_oh = target
-            valid = (target_oh.sum(dim=1, keepdim=True) > 0).float()
+            # valid = (target_oh.sum(dim=1, keepdim=True) > 0).float()
+            valid_mask = (target_oh.sum(dim=1, keepdim=True) > 0).squeeze(1)
+            # valid_mask shape -> (N,H,W)
 
         elif len(predict.shape) == 4:
-            valid = (target != self.ignore_index)
+            valid_mask = (target != self.ignore_index)
+            # Ensure valid_mask is a tensor with same shape as target
+            if isinstance(valid_mask, bool):
+                valid_mask = torch.full_like(target, valid_mask, 
+                                             dtype=torch.bool, device=device)
+
             # safe_target = target.masked_fill(~valid, 0)
-            safe_target = _as_long_index(target.masked_fill(~valid, 0))
+            # safe_target = _as_long_index(target.masked_fill(~valid, 0))
+            safe_target = _as_long_index(target.masked_fill(~valid_mask, 0))
             target_oh = (F.one_hot(safe_target, num_classes=nclass)
                          .permute(0, 3, 1, 2)
                          .contiguous())
-            valid = valid.unsqueeze(1).float()
+            # valid = valid.unsqueeze(1).float()
 
         else:
             raise ValueError(f"The shapes of 'predict' and 'target' are "\
                              f"incompatible.")
+        
+        # valid_float has shape [N,1,H,W] for multiplication with channel dim
+        valid_float = valid_mask.unsqueeze(1).float()
 
         tversky = BinaryTverskyFocalLoss(**self.kwargs)
         total_loss = 0
@@ -118,8 +129,8 @@ class TverskyFocalLoss(nn.Module):
         predict = F.softmax(predict, dim=1)
 
         for i in range(nclass):
-            tversky_loss = tversky(predict[:, i] * valid, 
-                                   target_oh[:, i] * valid)
+            tversky_loss = tversky(predict[:, i] * valid_float, 
+                                   target_oh[:, i] * valid_float)
             assert self.weight.shape[0] == nclass, \
                 f"Expect weight shape [{nclass}], get[{self.weight.shape[0]}]"
             tversky_loss *= self.weight[i]
@@ -149,29 +160,129 @@ class LocallyWeightedTverskyFocalLoss(nn.Module):
         self.ignore_index = ignore_index
 
     def calculate_weights(self, target, num_class):
+        import torch
 
-        valid = (target != self.ignore_index)
-        unique, unique_counts = torch.unique(target[valid], return_counts=True)
+        # Coerce to tensor if needed
+        if not isinstance(target, torch.Tensor):
+            try:
+                target = torch.as_tensor(target)
+            except Exception:
+                return torch.ones(num_class, device="cpu") * 1e-5
+
+        # Convert one-hot (N,C,H,W) -> labels (N,H,W)
+        if target.dim() == 4 and target.shape[1] == num_class:
+            target_labels = target.argmax(dim=1)
+        else:
+            target_labels = target
+
+        device = target_labels.device if hasattr(target_labels, "device") else torch.device("cpu")
+
+        # Build valid mask; treat ignore_index=None as "no ignore"
+        if getattr(self, "ignore_index", None) is None:
+            valid = torch.ones_like(target_labels, dtype=torch.bool, device=device)
+        else:
+            try:
+                valid = (target_labels != self.ignore_index)
+            except Exception:
+                valid = torch.tensor(bool(target_labels != self.ignore_index), dtype=torch.bool, device=device)
+
+        if isinstance(valid, bool):
+            valid = torch.tensor(valid, dtype=torch.bool, device=device)
+
+        if valid.numel() == 0:
+            return torch.ones(num_class, device=device) * 1e-5
+
+        valid_sum = valid.sum()
+        if isinstance(valid_sum, torch.Tensor):
+            if valid_sum.item() == 0:
+                return torch.ones(num_class, device=device) * 1e-5
+            denom = valid_sum.float().to(device)
+        else:
+            if not bool(valid_sum):
+                return torch.ones(num_class, device=device) * 1e-5
+            denom = torch.tensor(float(valid_sum), device=device)
+
+        unique, unique_counts = torch.unique(target_labels[valid], 
+                                             return_counts=True)
+
+        # Filter out any labels outside [0, num_class-1] and also ignore_index 
+        # (if present)
+        if unique.numel() == 0:
+            return torch.ones(num_class, device=device) * 1e-5
+
+        # build mask of valid unique indices
+        in_range_mask = (unique >= 0) & (unique < num_class)
+        if getattr(self, "ignore_index", None) is not None:
+            in_range_mask &= (unique != self.ignore_index)
+
+        if not in_range_mask.any():
+            return torch.ones(num_class, device=device) * 1e-5
+
+        unique = unique[in_range_mask]
+        unique_counts = unique_counts[in_range_mask].to(device).float()
+
+        ratio = unique_counts / denom.clamp_min(1e-6)
+        weight = (1.0 / ratio)
+        weight = weight / weight.sum()
+
+        loss_weight = torch.ones(num_class, device=device) * 1e-5
+        for i, idx in enumerate(unique):
+            # safe index assignment (idx guaranteed in [0,num_class-1])
+            loss_weight[int(idx.item())] = weight[i].to(device)
+
+        return loss_weight
+
+        # valid = (target != self.ignore_index)
+        # unique, unique_counts = torch.unique(target[valid], return_counts=True)
+        # # ratio = unique_counts.float() / valid.sum().float()
+        # # weight = (1. / ratio) / torch.sum(1. / ratio)
+
+        # # loss_weight = torch.ones(num_class, device=target.device) * 0.00001
+        # # for i in range(len(unique)):
+        # #     loss_weight[unique[i]] = weight[i]
+
+        # # return loss_weight
+        # # ensure integer indices for indexing (suggested fix from GPT-5 mini)
+        # unique = unique.to(torch.long)
         # ratio = unique_counts.float() / valid.sum().float()
-        # weight = (1. / ratio) / torch.sum(1. / ratio)
 
-        # loss_weight = torch.ones(num_class, device=target.device) * 0.00001
-        # for i in range(len(unique)):
-        #     loss_weight[unique[i]] = weight[i]
+        # weight = (1.0 / ratio) / torch.sum(1.0 / ratio)
+
+        # loss_weight = torch.ones(num_class, device=target.device) * 1e-5
+        # # use Python ints (or .item()) when indexing to avoid dtype/device issues
+        # for i, idx in enumerate(unique):
+        #     loss_weight[int(idx.item())] = weight[i]
 
         # return loss_weight
-        # ensure integer indices for indexing (suggested fix from GPT-5 mini)
-        unique = unique.to(torch.long)
-        ratio = unique_counts.float() / valid.sum().float()
+    
+        # # Ensure target is a torch.Tensor
+        # if not isinstance(target, torch.Tensor):
+        #     target = torch.as_tensor(target)
 
-        weight = (1.0 / ratio) / torch.sum(1.0 / ratio)
+        # device = target.device
 
-        loss_weight = torch.ones(num_class, device=target.device) * 1e-5
-        # use Python ints (or .item()) when indexing to avoid dtype/device issues
-        for i, idx in enumerate(unique):
-            loss_weight[int(idx.item())] = weight[i]
+        # # valid is a bool tensor marking entries we should count
+        # valid = (target != self.ignore_index)
 
-        return loss_weight        
+        # # If there are no valid pixels, return tiny uniform weights
+        # if valid.numel() == 0 or valid.sum().item() == 0:
+        #     return torch.ones(num_class, device=device) * 1e-5
+
+        # unique, unique_counts = torch.unique(target[valid], return_counts=True)
+        # unique = unique.long()
+
+        # # keep everything on the same device and avoid div-by-zero
+        # denom = valid.sum().float().to(unique_counts.device).clamp_min(1e-6)
+        # ratio = unique_counts.float() / denom
+
+        # weight = (1.0 / ratio)
+        # weight = weight / weight.sum()
+
+        # loss_weight = torch.ones(num_class, device=device) * 1e-5
+        # for i, idx in enumerate(unique):
+        #     loss_weight[int(idx.item())] = weight[i].to(device)
+
+        # return loss_weight     
 
     def forward(self, predict, target):
         num_class = predict.shape[1]
