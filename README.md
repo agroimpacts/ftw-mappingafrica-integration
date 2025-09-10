@@ -76,3 +76,20 @@ If the –dryrun variant shows a successful download, run the final line to down
 ## Working with the data
 
 Data classes based on those in `ftw-baselines` and `torchgeo` are being developed here. See the working [data-modules.ipynb](notebooks/data-modules.ipynb).
+
+## Training and evaluation
+
+From the CLI, the model can be trained as follows:
+
+```bash
+ftw_ma model fit -c configs/config.yaml
+```
+
+See the [example config](configs/example-config.yaml) for settings. 
+
+To test the model:
+
+```bash
+CHKPT=/path/to/checkpoint/checkpoint.ckpt 
+ftw_ma model test -c configs/config.yaml -m  --gpu 0 -o metrics.json
+```
