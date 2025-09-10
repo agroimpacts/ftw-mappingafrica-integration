@@ -32,8 +32,8 @@ model:
 
 data:
   class_path: ftw_ma.datamodule.FTWMapAfricaDataModule
-  # class_path: datamodule.FTWMapAfricaDataModule
   init_args:
+    temporal_options: windowA
     batch_size: 32
     num_workers: 8
     num_samples: -1

@@ -1,4 +1,4 @@
-# FTWMapAfricaDataModule forr managing data loading and augmentation
+# FTWMapAfricaDataModule for managing data loading and augmentation
 import warnings
 import kornia.augmentation as K
 from torchgeo.transforms import SatSlideMix
@@ -130,7 +130,7 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
                 split="test",
                 # temporal_options=self.temporal_options,
                 # num_samples=self.num_samples,
-                transforms=self.aug,
+                transforms=None,
                 **self.kwargs,
             )
 

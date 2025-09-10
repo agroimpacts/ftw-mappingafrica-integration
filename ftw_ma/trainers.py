@@ -143,7 +143,6 @@ class CustomSemanticSegmentationTask(BaseTask):
             self.criterion = nn.CrossEntropyLoss(
                 ignore_index=ignore_value, weight=class_weights
             )
-
         elif loss == "jaccard":
             self.criterion = smp.losses.JaccardLoss(
                 mode="multiclass", classes=self.hparams["num_classes"]
