@@ -2,7 +2,7 @@ trainer:
   max_epochs: 3
   log_every_n_steps: 1
   accelerator: "mps"
-  default_root_dir: ~/training_logs
+  default_root_dir: ~/models/unet-effb3-localtversky
   devices:
     - 0
   callbacks:

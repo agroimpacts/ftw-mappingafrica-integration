@@ -75,7 +75,7 @@ If the –dryrun variant shows a successful download, run the final line to down
 
 ## Working with the data
 
-Data classes based on those in `ftw-baselines` and `torchgeo` are being developed here. See the working [data-modules.ipynb](notebooks/data-modules.ipynb).
+Data classes based on those in `ftw-baselines` and `torchgeo` are used here, based on those used in `ftw-baselines`, with modifications to provide additional augmentations and to read from the combined [catalog file](data/ftw-mappingafrica-combined-catalog.csv). See the [data-modules.ipynb](notebooks/data-modules.ipynb) for additional details. 
 
 ## Training and evaluation
 
@@ -91,5 +91,5 @@ To test the model:
 
 ```bash
 CHKPT=/path/to/checkpoint/checkpoint.ckpt 
-ftw_ma model test -c configs/config.yaml -m  --gpu 0 -o metrics.json
+ftw_ma model test -c configs/config.yaml -m $CHKPT --gpu 0 -o metrics.json
 ```

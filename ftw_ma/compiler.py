@@ -46,6 +46,7 @@ def fit(config, ckpt_path, cli_args):
     
     print("Finished")
 
+
 def test(config, model, gpu, iou_threshold, out):
     """Command to test the model."""
 
@@ -158,7 +159,9 @@ def test(config, model, gpu, iou_threshold, out):
         if not os.path.exists(out):
             with open(out, "w") as f:
                 f.write(
-                    "train_checkpoint,pixel_level_iou,pixel_level_precision,pixel_level_recall,object_level_precision,object_level_recall\n"
+                    "train_checkpoint,pixel_level_iou,\
+                        pixel_level_precision,pixel_level_recall,\
+                            object_level_precision,object_level_recall\n"
                 )
         with open(out, "a") as f:
             f.write(
