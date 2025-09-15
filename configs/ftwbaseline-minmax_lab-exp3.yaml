@@ -2,7 +2,7 @@ trainer:
   max_epochs: 100
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ~/models/ftwbaseline-minmax_lab-exp3
+  default_root_dir: ~/working/models/ftwbaseline-minmax_lab-exp3
   devices:
     - 0
   callbacks:
@@ -20,7 +20,7 @@ model:
       - 0.04
       - 0.08
       - 0.88
-    loss: ce
+    loss: localtversky
     model: unet
     backbone: efficientnet-b3
     weights: true
@@ -39,7 +39,7 @@ data:
     num_workers: 8
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
-    catalog: /home/airg/lestes/projects/ftw-mappingafrica-integration/data/ftw-catalog.csv
+    catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-catalog.csv
     normalization_strategy: min_max
     normalization_stat_procedure: lab
     global_stats: null

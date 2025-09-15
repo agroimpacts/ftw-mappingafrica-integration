@@ -2,7 +2,7 @@ trainer:
   max_epochs: 100
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ~/models/ftwbaseline-localtversky-exp2
+  default_root_dir: ~/working/models/ftwbaseline-localtversky-exp2
   devices:
     - 0
   callbacks:
