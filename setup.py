@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ftw_ma",
-    version="0.0.1",
+    version="0.0.2",
     author="Lyndon Estes",
     author_email="lestes@clarku.edu",
     url="https://github.com/agroimpacts/ftw-mappingafrica-integration",    

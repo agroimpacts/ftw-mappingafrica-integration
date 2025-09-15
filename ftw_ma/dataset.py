@@ -26,7 +26,7 @@ class FTWMapAfrica(NonGeoDataset):
         catalog: str = "../data/mappingafrica-3class-labels.csv",
         data_dir: str = None,
         split: str = "train",
-        temporal_options: str = "windowA",
+        temporal_options: str = "windowB",
         num_samples: int = -1,
         normalization_strategy: str = "min_max",
         normalization_stat_procedure: str = "lab",
@@ -64,13 +64,33 @@ class FTWMapAfrica(NonGeoDataset):
         self.filenames = []
         all_filenames = []
 
-        for idx, row in self.data.iterrows():
-            all_filenames.append({
-                "window_a": Path(self.data_dir) / row['window_a'],
-                "window_b": Path(self.data_dir) / row['window_b'] \
-                    if "windowB" in self.temporal_options else None,
-                "mask": Path(self.data_dir) / row['mask']
-            })
+        # for idx, row in self.data.iterrows():
+        #     all_filenames.append({
+        #         "window_a": Path(self.data_dir) / row['window_a'],
+        #         "window_b": Path(self.data_dir) / row['window_b'] \
+        #             if "windowB" in self.temporal_options else None,
+        #         "mask": Path(self.data_dir) / row['mask']
+        #     })
+
+        base = Path(self.data_dir) if self.data_dir is not None else Path(".")
+
+        def _to_path(value):
+            # pandas may represent missing fields as NaN (a float)
+            if pd.isna(value):
+                return None
+            return base / str(value)
+
+        for _, row in self.data.iterrows():
+            wa = _to_path(row.get("window_a"))
+            wb = _to_path(row.get("window_b"))
+            m = _to_path(row.get("mask"))
+            # skip entries missing a mask (can't train without labels)
+            if m is None:
+                continue
+            # only include window_b when temporal option requires it
+            wb_entry = wb if ("windowB" in self.temporal_options) else None
+            all_filenames.append({"window_a": wa, "window_b": wb_entry, 
+                                  "mask": m})
 
         if self.num_samples == -1:  # select all samples
             self.filenames = all_filenames

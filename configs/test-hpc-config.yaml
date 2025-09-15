@@ -16,9 +16,8 @@ trainer:
 
 model:
   class_path: ftw_ma.trainers.CustomSemanticSegmentationTask
-  # class_path: trainers.CustomSemanticSegmentationTask
   init_args:
-    loss: localtversky #"ce", "focal", "dice", "localtversky"
+    loss: "ce" # "focal", "dice", "localtversky"
     model: unet
     backbone: efficientnet-b3
     weights: TRUE
@@ -33,7 +32,7 @@ model:
 data:
   class_path: ftw_ma.datamodule.FTWMapAfricaDataModule
   init_args:
-    temporal_options: windowA
+    temporal_options: windowB
     batch_size: 32
     num_workers: 8
     num_samples: -1
