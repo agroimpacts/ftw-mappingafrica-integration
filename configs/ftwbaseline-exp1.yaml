@@ -17,9 +17,9 @@ model:
   class_path: ftw_ma.trainers.CustomSemanticSegmentationTask
   init_args:
     class_weights:
-      - 0.04
-      - 0.08
-      - 0.88
+      - 0.05
+      - 0.2
+      - 0.75
     loss: ce
     model: unet
     backbone: efficientnet-b3
