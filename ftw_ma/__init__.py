@@ -1,7 +1,8 @@
 """
 FTW Mapping Africa Integration
 
-This package contains modules for loading, augmenting, and processing field boundary datasets for Africa.
+This package contains modules for loading, augmenting, and processing field 
+boundary datasets for Africa.
 """
 import warnings
 
@@ -19,3 +20,4 @@ from .losses import *
 from .trainers import *
 from .cli import *
 from .compiler import *
+# from .metrics import *

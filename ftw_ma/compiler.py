@@ -2,7 +2,8 @@ import os
 import sys
 import time
 import yaml
-import tempfile
+
+# import tempfile
 from tqdm import tqdm
 
 import numpy as np
@@ -13,6 +14,8 @@ from torchgeo.trainers import BaseTask
 from torchmetrics import JaccardIndex, MetricCollection, Precision, Recall
 
 from ftw.metrics import get_object_level_metrics
+# from .metrics import get_object_level_metrics
+# from PIL import Image
 
 from .trainers import *
 from .datamodule import FTWMapAfricaDataModule
@@ -47,7 +50,7 @@ def fit(config, ckpt_path, cli_args):
     print("Finished")
 
 
-def test(config, model, gpu, iou_threshold, out):
+def test(config, model_path, gpu, iou_threshold, out):
     """Command to test the model."""
 
     with open(config, "r") as f:
@@ -71,7 +74,7 @@ def test(config, model, gpu, iou_threshold, out):
     print("Loading model")
     tic = time.time()
     trainer = CustomSemanticSegmentationTask.load_from_checkpoint(
-        model, map_location="cpu"
+        model_path, map_location="cpu"
     )
     model = trainer.model.eval().to(device)
     print(f"Model loaded in {time.time() - tic:.2f}s")
@@ -121,6 +124,19 @@ def test(config, model, gpu, iou_threshold, out):
         outputs = outputs.cpu().numpy().astype(np.uint8)
         masks = masks.cpu().numpy().astype(np.uint8)
 
+        # Save each output and mask as an image for inspection (for check)
+        # output_dir = f"{os.path.dirname(out)}/test_outputs"
+        # mask_dir = f"{os.path.dirname(out)}/test_masks"
+        # os.makedirs(output_dir, exist_ok=True)
+        # os.makedirs(mask_dir, exist_ok=True)
+
+        # for i in range(outputs.shape[0]):
+        #     output_path = os.path.join(output_dir, f"output_{i}.png")
+        #     mask_path = os.path.join(mask_dir, f"mask_{i}.png")
+        #     # Use PIL to save as PNG images
+        #     Image.fromarray(outputs[i]).save(output_path)
+        #     Image.fromarray(masks[i]).save(mask_path)        
+
         for i in range(len(outputs)):
             output = outputs[i]
             mask = masks[i]
@@ -159,13 +175,13 @@ def test(config, model, gpu, iou_threshold, out):
         if not os.path.exists(out):
             with open(out, "w") as f:
                 f.write(
-                    "train_checkpoint,pixel_level_iou,\
-                        pixel_level_precision,pixel_level_recall,\
-                            object_level_precision,object_level_recall\n"
+                    f"train_checkpoint,pixel_level_iou,"\
+                    f"pixel_level_precision,pixel_level_recall,"\
+                    f"object_level_precision,object_level_recall\n"
                 )
         with open(out, "a") as f:
             f.write(
-                f"{model},{pixel_level_iou},"\
+                f"{model_path},{pixel_level_iou},"\
                 f"{pixel_level_precision},{pixel_level_recall},"\
                 f"{object_precision},{object_recall}\n"
             )
