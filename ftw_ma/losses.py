@@ -174,16 +174,19 @@ class LocallyWeightedTverskyFocalLoss(nn.Module):
         else:
             target_labels = target
 
-        device = target_labels.device if hasattr(target_labels, "device") else torch.device("cpu")
+        device = target_labels.device if hasattr(target_labels, "device") \
+            else torch.device("cpu")
 
         # Build valid mask; treat ignore_index=None as "no ignore"
         if getattr(self, "ignore_index", None) is None:
-            valid = torch.ones_like(target_labels, dtype=torch.bool, device=device)
+            valid = torch.ones_like(target_labels, dtype=torch.bool, 
+                                    device=device)
         else:
             try:
                 valid = (target_labels != self.ignore_index)
             except Exception:
-                valid = torch.tensor(bool(target_labels != self.ignore_index), dtype=torch.bool, device=device)
+                valid = torch.tensor(bool(target_labels != self.ignore_index), 
+                                     dtype=torch.bool, device=device)
 
         if isinstance(valid, bool):
             valid = torch.tensor(valid, dtype=torch.bool, device=device)
