@@ -2,7 +2,7 @@ trainer:
   max_epochs: 100
   log_every_n_steps: 10
   accelerator: "cuda"
-  default_root_dir: ~/models/unet-effb3-ce
+  default_root_dir: ~/working/models/unet-effb3-ce
   devices:
     - 0
   callbacks:
@@ -38,7 +38,7 @@ data:
     num_workers: 8
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
-    catalog: /home/airg/lestes/projects/ftw-mappingafrica-integration/data/ftw-catalog.csv
+    catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-catalog.csv
     normalization_strategy: z_value
     normalization_stat_procedure: gpb
     global_stats:
