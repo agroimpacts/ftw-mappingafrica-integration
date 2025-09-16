@@ -116,7 +116,7 @@ class CustomSemanticSegmentationTask(BaseTask):
                 "ignore_index has no effect on training when loss='jaccard'",
                 UserWarning,
             )
-
+        # print(model_kwargs)
         self.weights = weights
         super().__init__()
         print(self.hparams)
