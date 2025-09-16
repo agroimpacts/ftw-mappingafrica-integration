@@ -5,7 +5,7 @@ import random
 from matplotlib import colors
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from typing import Optional, Callable, Any
+from typing import Optional, Callable, Union, Dict, Any, Tuple, List
 import pandas as pd
 import numpy as np
 import rasterio
@@ -30,7 +30,7 @@ class FTWMapAfrica(NonGeoDataset):
         num_samples: int = -1,
         normalization_strategy: str = "min_max",
         normalization_stat_procedure: str = "lab",
-        global_stats: tuple = None,
+        global_stats: Optional[Union[Dict[str, Any], Tuple, List]] = None,
         img_clip_val: float = 0,
         nodata: list = None,
         transforms: Optional[Callable[[dict], dict]] = None,
@@ -46,7 +46,7 @@ class FTWMapAfrica(NonGeoDataset):
             num_samples (int): Number of samples to use (-1 for all).
             normalization_strategy (str): Normalization strategy.
             normalization_stat_procedure (str): Procedure for normalization.
-            global_stats (tuple): Precomputed global stats.
+            global_stats (tuple, list): Precomputed global stats.
             img_clip_val (float): Value to clip image data.
             nodata (list): List of nodata values.
             transforms (callable): Augmentation/transformation pipeline.

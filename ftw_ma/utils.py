@@ -44,7 +44,7 @@ def load_image(
     img_nodata = src.nodata
     nodata_val_ls = list(set(nodata_val_ls + [img_nodata])) if nodata_val_ls \
         else [img_nodata]
-
+    
     if apply_normalization:
         img = normalize_image(
             img,

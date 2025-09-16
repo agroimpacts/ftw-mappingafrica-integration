@@ -3,8 +3,7 @@ trainer:
   log_every_n_steps: 10
   accelerator: cuda
   default_root_dir: ~/working/models/ftwbaseline-photometric-exp5
-  devices:
-    - 0
+  devices: [0]
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
@@ -16,11 +15,8 @@ trainer:
 model:
   class_path: ftw_ma.trainers.CustomSemanticSegmentationTask
   init_args:
-    class_weights:
-      - 0.05
-      - 0.2
-      - 0.75
-    loss: localtversky
+    class_weights: [0.05, 0.2, 0.75]
+    loss: ce
     model: unet
     backbone: efficientnet-b3
     weights: true
@@ -43,23 +39,8 @@ data:
     normalization_strategy: z_value
     normalization_stat_procedure: gpb
     global_stats:
-      mean:
-        - 0
-        - 0
-        - 0
-        - 0
-      std:
-        - 3000
-        - 3000
-        - 3000
-        - 3000
+      mean: [0, 0, 0, 0]
+      std: [3000, 3000, 3000, 3000]
     img_clip_val: 0
-    aug_list:
-      - rotation
-      - hflip
-      - vflip
-      - sharpness
-      - brightness
-      - contrast
-      - gaussian_noise
+    aug_list: [rotation, hflip, vflip, sharpness, brightness, contrast, gaussian_noise]
 seed_everything: 7
