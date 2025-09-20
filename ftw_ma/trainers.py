@@ -281,13 +281,16 @@ class CustomSemanticSegmentationTask(BaseTask):
 
     def validation_step(
         self, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
+    ) -> Tensor:
         """Compute the validation loss and additional metrics.
 
         Args:
             batch: The output of your DataLoader.
             batch_idx: Integer displaying index of this batch.
             dataloader_idx: Index of the current dataloader.
+        
+        Returns:
+            The loss tensor.
         """
         x = batch["image"]
         y = batch["mask"]
@@ -338,14 +341,19 @@ class CustomSemanticSegmentationTask(BaseTask):
                         )
                 plt.close()
 
+        return loss
+
     def test_step(self, batch: Any, batch_idx: int, 
-                  dataloader_idx: int = 0) -> None:
+                  dataloader_idx: int = 0) -> Tensor:
         """Compute the test loss and additional metrics.
 
         Args:
             batch: The output of your DataLoader.
             batch_idx: Integer displaying index of this batch.
             dataloader_idx: Index of the current dataloader.
+        
+        Returns:
+            The loss tensor.
         """
         x = batch["image"]
         y = batch["mask"]
@@ -361,6 +369,7 @@ class CustomSemanticSegmentationTask(BaseTask):
         self.log("test_loss", loss)
         self.test_metrics(y_hat, y)
         self.log_dict(self.test_metrics)
+        return loss
 
     def predict_step(
         self, batch: Any, batch_idx: int, dataloader_idx: int = 0
