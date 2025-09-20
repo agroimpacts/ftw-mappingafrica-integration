@@ -116,7 +116,7 @@ class CustomSemanticSegmentationTask(BaseTask):
                 "ignore_index has no effect on training when loss='jaccard'",
                 UserWarning,
             )
-        # print(model_kwargs)
+        print(model_kwargs)
         self.weights = weights
         super().__init__()
         print(self.hparams)
@@ -267,21 +267,27 @@ class CustomSemanticSegmentationTask(BaseTask):
         y = batch["mask"]
         y_hat = self(x)
 
-        # y = y.to(device=y_hat.device)
-        # if isinstance(self.criterion, nn.CrossEntropyLoss):
-        #     y = y.long()
-        # else:
-        #     y = y.type_as(y_hat)
-
         loss: Tensor = self.criterion(y_hat, y)
-        self.log("train_loss", loss)
+        # self.log("train_loss", loss)
+        self.log(
+            "train_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            batch_size=x.size(0),
+            sync_dist=True,
+        )        
         self.train_metrics(y_hat, y)
-        self.log_dict(self.train_metrics)
+        # self.log_dict(self.train_metrics)
+        self.log_dict(self.train_metrics, on_step=False, on_epoch=True, 
+                      batch_size=x.size(0))
+        
         return loss
 
     def validation_step(
         self, batch: Any, batch_idx: int, dataloader_idx: int = 0
-    ) -> None:
+    ) -> Tensor:
         """Compute the validation loss and additional metrics.
 
         Args:
@@ -289,20 +295,28 @@ class CustomSemanticSegmentationTask(BaseTask):
             batch_idx: Integer displaying index of this batch.
             dataloader_idx: Index of the current dataloader.
         """
+        
         x = batch["image"]
         y = batch["mask"]
         y_hat = self(x)
 
-        # y = y.to(device=y_hat.device)
-        # if isinstance(self.criterion, nn.CrossEntropyLoss):
-        #     y = y.long()
-        # else:
-        #     y = y.type_as(y_hat)
-
         loss: Tensor = self.criterion(y_hat, y)
-        self.log("val_loss", loss)
+        # self.log("val_loss", loss)
+        # fix to make sure loss accumulates properly
+        self.log(
+            "val_loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            batch_size=x.size(0),
+            sync_dist=True,   # good for multi-GPU, safe otherwise
+        )
         self.val_metrics(y_hat, y)
-        self.log_dict(self.val_metrics)
+        # self.log_dict(self.val_metrics)
+        self.log_dict(self.val_metrics, on_step=False, on_epoch=True, 
+                      prog_bar=True, batch_size=x.size(0))
+
 
         if (
             batch_idx < 10
@@ -337,7 +351,7 @@ class CustomSemanticSegmentationTask(BaseTask):
                             global_step=self.global_step
                         )
                 plt.close()
-
+                
     def test_step(self, batch: Any, batch_idx: int, 
                   dataloader_idx: int = 0) -> None:
         """Compute the test loss and additional metrics.
@@ -350,12 +364,6 @@ class CustomSemanticSegmentationTask(BaseTask):
         x = batch["image"]
         y = batch["mask"]
         y_hat = self(x)
-
-        # y = y.to(device=y_hat.device)
-        # if isinstance(self.criterion, nn.CrossEntropyLoss):
-        #     y = y.long()
-        # else:
-        #     y = y.type_as(y_hat)
 
         loss: Tensor = self.criterion(y_hat, y)
         self.log("test_loss", loss)
@@ -465,3 +473,4 @@ class CustomSemanticSegmentationTask(BaseTask):
         else:
             print(f"Due to mismatch in the Tensor size, unable to patch "
                   "weights.")
+            
