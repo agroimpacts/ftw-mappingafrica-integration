@@ -20,7 +20,7 @@ model:
     model: unet
     backbone: tu-vgg19_bn.tv_in1k
     weights: true
-    patch_weights: false
+    patch_weights: true
     in_channels: 4
     num_classes: 3
     ignore_index: 3
