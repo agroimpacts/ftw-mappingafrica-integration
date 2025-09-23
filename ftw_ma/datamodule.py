@@ -189,8 +189,8 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         if stage == "fit":
             self.train_dataset = FTWMapAfrica(
                 split="train",
-                normalization_stat_procedure=self.normalization_stat_procedure,
                 normalization_strategy=self.normalization_strategy, 
+                normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
                 transforms=self.train_aug,
                 **self.kwargs,
@@ -198,8 +198,8 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         if stage in ["fit", "validate"]:
             self.val_dataset = FTWMapAfrica(
                 split="validate",
-                normalization_stat_procedure=self.normalization_stat_procedure,
                 normalization_strategy=self.normalization_strategy, 
+                normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
                 transforms=None,
                 **self.kwargs,
@@ -207,8 +207,8 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         if stage == "test":
             self.test_dataset = FTWMapAfrica(
                 split="test",                
-                normalization_stat_procedure=self.normalization_stat_procedure,
                 normalization_strategy=self.normalization_strategy, 
+                normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
                 transforms=None,
                 **self.kwargs,

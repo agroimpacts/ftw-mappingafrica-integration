@@ -119,21 +119,39 @@ class TverskyFocalLoss(nn.Module):
         tversky = BinaryTverskyFocalLoss(**self.kwargs)
         total_loss = 0
         
+        # if self.weight is None:
+        #     self.weight = torch.Tensor([1. / nclass] * nclass).to(device)
+        # else:
+        #     if isinstance(self.weight, list):
+        #         self.weight = (torch.tensor(self.weight, dtype=torch.float64)
+        #                        .to(device))
+        ## attempted fix for validation loss issue 
         if self.weight is None:
-            self.weight = torch.Tensor([1. / nclass] * nclass).to(device)
+            weight = torch.full((nclass,), 1.0 / nclass, dtype=torch.float32, 
+                                device=device)
         else:
             if isinstance(self.weight, list):
-                self.weight = (torch.tensor(self.weight, dtype=torch.float64)
-                               .to(device))
-        
+                weight = torch.tensor(self.weight, dtype=torch.float32, 
+                                      device=device)
+            elif isinstance(self.weight, torch.Tensor):
+                weight = self.weight.to(device=device, dtype=torch.float32)
+            else:
+                # fallback: try to build a tensor from scalar-like weight
+                weight = torch.tensor([float(self.weight)] * nclass, 
+                                      dtype=torch.float32, device=device)
+
         predict = F.softmax(predict, dim=1)
 
         for i in range(nclass):
             tversky_loss = tversky(predict[:, i] * valid_float, 
                                    target_oh[:, i] * valid_float)
-            assert self.weight.shape[0] == nclass, \
-                f"Expect weight shape [{nclass}], get[{self.weight.shape[0]}]"
-            tversky_loss *= self.weight[i]
+            # assert self.weight.shape[0] == nclass, \
+            #     f"Expect weight shape [{nclass}], get[{self.weight.shape[0]}]"
+            # tversky_loss *= self.weight[i]
+            ## attempted fix for validation loss issue 
+            assert weight.shape[0] == nclass, \
+                f"Expect weight shape [{nclass}], get[{weight.shape[0]}]"
+            tversky_loss *= weight[i]            
             total_loss += tversky_loss
             
         return total_loss
@@ -291,13 +309,21 @@ class LocallyWeightedTverskyFocalLoss(nn.Module):
         # Calculate the weights based on the current batch
         loss_weight = self.calculate_weights(target, num_class)
 
-        # Initialize the loss
+        ## Attempted fix for validation loss issue
+        if isinstance(loss_weight, torch.Tensor):
+            loss_weight = loss_weight.to(device=predict.device, 
+                                         dtype=torch.float32)
+        else:
+            loss_weight = torch.tensor(loss_weight, dtype=torch.float32, 
+                                       device=predict.device)
+        ##
+
+        # Initialize the loss using the local weight tensor
         loss_fn = TverskyFocalLoss(weight=loss_weight, 
                                    ignore_index=self.ignore_index, 
                                    **self.kwargs)
-        
-        return loss_fn(predict, target)
 
+        return loss_fn(predict, target)
 
 class TverskyFocalCELoss(nn.Module):
     """
@@ -344,8 +370,21 @@ class TverskyFocalCELoss(nn.Module):
             smooth=self.tversky_smooth, alpha=self.tversky_alpha, 
             gamma=self.tversky_gamma
         )
-        ce = nn.CrossEntropyLoss(weight=self.loss_weight, 
+        # ce = nn.CrossEntropyLoss(weight=self.loss_weight, 
+        #                          ignore_index=self.ignore_index)
+        ## Attempted fix for validation loss issue
+        ce_weight = None
+        if self.loss_weight is not None:
+            if isinstance(self.loss_weight, list):
+                ce_weight = torch.tensor(self.loss_weight, dtype=torch.float32, 
+                                         device=predict.device)
+            elif isinstance(self.loss_weight, torch.Tensor):
+                ce_weight = self.loss_weight.to(device=predict.device, 
+                                                dtype=torch.float32)
+                
+        ce = nn.CrossEntropyLoss(weight=ce_weight, 
                                  ignore_index=self.ignore_index)
+        ##        
         loss = self.tversky_weight * tversky(predict, target) + \
             (1 - self.tversky_weight) * ce(predict, target)
 
@@ -384,9 +423,13 @@ class LocallyWeightedTverskyFocalCELoss(nn.Module):
 
         lossWeight = torch.ones(predict.shape[1], 
                                 device=predict.device) * 0.00001
+        # for i in range(len(unique)):
+        #     lossWeight[unique[i]] = weight[i]
+        ## Attempted fix for validation loss issue
         for i in range(len(unique)):
-            lossWeight[unique[i]] = weight[i]
-
+            idx = int(unique[i].item())
+            lossWeight[idx] = weight[i].to(predict.device, dtype=torch.float32)
+        ##
         loss = TverskyFocalCELoss(loss_weight=lossWeight, **self.kwargs)
 
         return loss(predict, target)
