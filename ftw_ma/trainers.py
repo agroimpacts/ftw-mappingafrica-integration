@@ -45,7 +45,9 @@ class SafeLossWrapper(nn.Module):
             target = target.to(device=output.device, dtype=torch.long)
             output = output.to(device=output.device)
         else:
-            target = target.to(device=output.device, dtype=output.dtype)
+            # target = target.to(device=output.device, dtype=output.dtype)
+            target = target.to(device=output.device)
+            output = output.to(device=output.device)
 
         return self.criterion(output, target, *args, **kwargs)
 
@@ -165,7 +167,7 @@ class CustomSemanticSegmentationTask(BaseTask):
         else:
             raise ValueError(
                 f"Loss type '{loss}' is not valid. "
-                "Currently, supports 'ce', 'jaccard' or 'focal' loss."
+                "Currently, supports 'ce', 'jaccard', 'focal', 'localtversky'."
             )
         self.criterion = SafeLossWrapper(self.criterion)
 
@@ -275,7 +277,8 @@ class CustomSemanticSegmentationTask(BaseTask):
             self.transfer_weights(self.model, backbone)
 
     def _log_per_class(self, metrics_dict, split: str):
-        # metrics_dict like {"precision": tensor(C,), "recall": tensor(C,), "iou": tensor(C,)}
+        # metrics_dict like {"precision": tensor(C,), "recall": tensor(C,), 
+        # "iou": tensor(C,)}
         for name, values in metrics_dict.items():
             # values is shape [C]
             for i, v in enumerate(values):
@@ -316,7 +319,7 @@ class CustomSemanticSegmentationTask(BaseTask):
             on_epoch=True,
             prog_bar=True,
             batch_size=x.size(0),
-            sync_dist=True,
+            sync_dist=True
         )
         self.train_metrics.update(y_hat, y)        
         
@@ -334,18 +337,39 @@ class CustomSemanticSegmentationTask(BaseTask):
         
         x = batch["image"]
         y = batch["mask"]
+        ## Attempted fix for validation loss issue
+        y = y.long().to(x.device)
+        ##
         y_hat = self(x)
 
         loss: Tensor = self.criterion(y_hat, y)
 
+        # DEBUG: print batch and per-sample loss values to trace validation 
+        # issues
+        try:
+            batch_loss_val = float(loss.detach().cpu().item())
+        except Exception:
+            batch_loss_val = None
+        print(f"[DEBUG] val batch_idx={batch_idx} batch_loss={batch_loss_val}")
+        # per-sample losses (may be slightly slower; useful for pinpointing 
+        # bad samples)
+        try:
+            per_sample_losses = []
+            for i in range(y_hat.shape[0]):
+                pl = self.criterion(y_hat[i : i + 1], y[i : i + 1])
+                per_sample_losses.append(float(pl.detach().cpu().item()))
+            print(f"[DEBUG] val batch_idx={batch_idx} per_sample_losses={per_sample_losses}")
+        except Exception as e:
+            print(f"[DEBUG] per-sample loss calc failed: {e}")
+
         self.log(
-            "val_loss",
+            "val/loss",
             loss,
             on_step=False,
             on_epoch=True,
             prog_bar=True,
             batch_size=x.size(0),
-            sync_dist=True,   # good for multi-GPU, safe otherwise
+            sync_dist=True   # good for multi-GPU, safe otherwise
         )
 
         for i in range(y_hat.shape[0]):
@@ -358,8 +382,13 @@ class CustomSemanticSegmentationTask(BaseTask):
             self.val_fps += fps
             self.val_fns += fns
 
-        self.val_metrics.update(y_hat, y)
-        self.val_agg.update(y_hat, y)
+        # self.val_metrics.update(y_hat, y)
+        # self.val_agg.update(y_hat, y)
+        ## Attempted fix for validation loss issue
+        preds = y_hat.argmax(dim=1)
+        self.val_metrics.update(preds, y)
+        self.val_agg.update(preds, y)
+        ##
 
         if (
             batch_idx < 10
@@ -405,7 +434,7 @@ class CustomSemanticSegmentationTask(BaseTask):
             dataloader_idx: Index of the current dataloader.
         """
         x = batch["image"]
-        y = batch["mask"].squeeze(1)
+        y = batch["mask"]
         y_hat = self(x)
         loss: Tensor = self.criterion(y_hat, y)
         self.log("test_loss", loss)

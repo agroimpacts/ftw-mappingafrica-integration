@@ -49,7 +49,6 @@ def fit(config, ckpt_path, cli_args):
     
     print("Finished")
 
-
 def test(config, model_path, gpu, iou_threshold, out):
     """Command to test the model."""
 
