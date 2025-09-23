@@ -26,30 +26,30 @@ from torchvision.models._api import WeightsEnum
 from .losses import *
 from ftw.metrics import get_object_level_metrics
 
-class SafeLossWrapper(nn.Module):
-    """Wrap any criterion and ensure target/output have compatible device/dtype.
-    This avoids loss implementations calling target.type(output.type()) which
-    fails on MPS (e.g. 'torch.mps.FloatTensor' strings). (not yet working)"""
-    def __init__(self, criterion: nn.Module):
-        super().__init__()
-        self.criterion = criterion
+# class SafeLossWrapper(nn.Module):
+#     """Wrap any criterion and ensure target/output have compatible device/dtype.
+#     This avoids loss implementations calling target.type(output.type()) which
+#     fails on MPS (e.g. 'torch.mps.FloatTensor' strings). (not yet working)"""
+#     def __init__(self, criterion: nn.Module):
+#         super().__init__()
+#         self.criterion = criterion
 
-    def forward(self, output: torch.Tensor, target: torch.Tensor, *args, 
-                **kwargs):
-        # move output to its device/dtype (no-op) and ensure target matches
-        if output is None or target is None:
-            return self.criterion(output, target, *args, **kwargs)
+#     def forward(self, output: torch.Tensor, target: torch.Tensor, *args, 
+#                 **kwargs):
+#         # move output to its device/dtype (no-op) and ensure target matches
+#         if output is None or target is None:
+#             return self.criterion(output, target, *args, **kwargs)
 
-        # CrossEntropy and similar expect integer class labels
-        if isinstance(self.criterion, (nn.CrossEntropyLoss,)):
-            target = target.to(device=output.device, dtype=torch.long)
-            output = output.to(device=output.device)
-        else:
-            # target = target.to(device=output.device, dtype=output.dtype)
-            target = target.to(device=output.device)
-            output = output.to(device=output.device)
+#         # CrossEntropy and similar expect integer class labels
+#         if isinstance(self.criterion, (nn.CrossEntropyLoss,)):
+#             target = target.to(device=output.device, dtype=torch.long)
+#             output = output.to(device=output.device)
+#         else:
+#             # target = target.to(device=output.device, dtype=output.dtype)
+#             target = target.to(device=output.device)
+#             output = output.to(device=output.device)
 
-        return self.criterion(output, target, *args, **kwargs)
+#         return self.criterion(output, target, *args, **kwargs)
 
 class CustomSemanticSegmentationTask(BaseTask):
     """Semantic Segmentation.
@@ -169,7 +169,7 @@ class CustomSemanticSegmentationTask(BaseTask):
                 f"Loss type '{loss}' is not valid. "
                 "Currently, supports 'ce', 'jaccard', 'focal', 'localtversky'."
             )
-        self.criterion = SafeLossWrapper(self.criterion)
+        # self.criterion = SafeLossWrapper(self.criterion)
 
     def configure_metrics(self) -> None:
         """Initialize the performance metrics."""
@@ -318,7 +318,7 @@ class CustomSemanticSegmentationTask(BaseTask):
             on_step=True,
             on_epoch=True,
             prog_bar=True,
-            batch_size=x.size(0),
+            # batch_size=x.size(0),
             sync_dist=True
         )
         self.train_metrics.update(y_hat, y)        
@@ -338,7 +338,7 @@ class CustomSemanticSegmentationTask(BaseTask):
         x = batch["image"]
         y = batch["mask"]
         ## Attempted fix for validation loss issue
-        y = y.long().to(x.device)
+        # y = y.long().to(x.device)
         ##
         y_hat = self(x)
 
@@ -368,7 +368,7 @@ class CustomSemanticSegmentationTask(BaseTask):
             on_step=False,
             on_epoch=True,
             prog_bar=True,
-            batch_size=x.size(0),
+            # batch_size=x.size(0),
             sync_dist=True   # good for multi-GPU, safe otherwise
         )
 
@@ -382,12 +382,12 @@ class CustomSemanticSegmentationTask(BaseTask):
             self.val_fps += fps
             self.val_fns += fns
 
-        # self.val_metrics.update(y_hat, y)
-        # self.val_agg.update(y_hat, y)
+        self.val_metrics.update(y_hat, y)
+        self.val_agg.update(y_hat, y)
         ## Attempted fix for validation loss issue
-        preds = y_hat.argmax(dim=1)
-        self.val_metrics.update(preds, y)
-        self.val_agg.update(preds, y)
+        # preds = y_hat.argmax(dim=1)
+        # self.val_metrics.update(preds, y)
+        # self.val_agg.update(preds, y)
         ##
 
         if (
