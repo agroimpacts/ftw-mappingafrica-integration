@@ -42,21 +42,6 @@ def fit(config, ckpt_path, cli_args):
 
     print(f"CLI arguments: {cli_args}")
 
-    # # Run LightningCLI by simulating sys.argv (avoid nested 
-    # # Click/Lit parsing issues)
-    # saved_argv = sys.argv
-    # try:
-    #     sys.argv = [saved_argv[0]] + list(cli_args)
-    #     LightningCLI(
-    #         model_class=BaseTask,
-    #         datamodule_class=BaseDataModule,
-    #         seed_everything_default=0,
-    #         subclass_mode_model=True,
-    #         subclass_mode_data=True,
-    #         save_config_kwargs={"overwrite": True},
-    #     )
-    # finally:
-    #     sys.argv = saved_argv
     # Best practices for Rasterio environment variables
     rasterio_best_practices = {
         "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
@@ -67,15 +52,30 @@ def fit(config, ckpt_path, cli_args):
     }
     os.environ.update(rasterio_best_practices)
 
-    # Run the LightningCLI with the constructed arguments
-    cli = LightningCLI(
-        model_class=BaseTask,
-        seed_everything_default=0,
-        subclass_mode_model=True,
-        subclass_mode_data=True,
-        save_config_kwargs={"overwrite": True},
-        args=cli_args,  # Pass the constructed cli_args
-    )
+    # Run LightningCLI by simulating sys.argv (avoid nested 
+    saved_argv = sys.argv
+    try:
+        sys.argv = [saved_argv[0]] + list(cli_args)
+        LightningCLI(
+            model_class=BaseTask,
+            datamodule_class=BaseDataModule,
+            seed_everything_default=0,
+            subclass_mode_model=True,
+            subclass_mode_data=True,
+            save_config_kwargs={"overwrite": True},
+        )
+    finally:
+        sys.argv = saved_argv
+
+    # # Run the LightningCLI with the constructed arguments
+    # cli = LightningCLI(
+    #     model_class=BaseTask,
+    #     seed_everything_default=0,
+    #     subclass_mode_model=True,
+    #     subclass_mode_data=True,
+    #     save_config_kwargs={"overwrite": True},
+    #     args=cli_args,  # Pass the constructed cli_args
+    # )
     
     print("Finished")
 
