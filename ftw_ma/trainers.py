@@ -339,24 +339,24 @@ class CustomSemanticSegmentationTask(BaseTask):
 
         loss: Tensor = self.criterion(y_hat, y)
 
-        # DEBUG: print batch and per-sample loss values to trace validation 
-        # issues
-        try:
-            batch_loss_val = float(loss.detach().cpu().item())
-        except Exception:
-            batch_loss_val = None
-        print(f"[DEBUG] val batch_idx={batch_idx} batch_loss={batch_loss_val}")
-        # per-sample losses (may be slightly slower; useful for pinpointing 
-        # bad samples)
-        try:
-            per_sample_losses = []
-            for i in range(y_hat.shape[0]):
-                pl = self.criterion(y_hat[i : i + 1], y[i : i + 1])
-                per_sample_losses.append(float(pl.detach().cpu().item()))
-            print(f"[DEBUG] val batch_idx={batch_idx} " \
-                  f"per_sample_losses={per_sample_losses}")
-        except Exception as e:
-            print(f"[DEBUG] per-sample loss calc failed: {e}")
+        # # DEBUG: print batch and per-sample loss values to trace validation 
+        # # issues
+        # try:
+        #     batch_loss_val = float(loss.detach().cpu().item())
+        # except Exception:
+        #     batch_loss_val = None
+        # print(f"[DEBUG] val batch_idx={batch_idx} batch_loss={batch_loss_val}")
+        # # per-sample losses (may be slightly slower; useful for pinpointing 
+        # # bad samples)
+        # try:
+        #     per_sample_losses = []
+        #     for i in range(y_hat.shape[0]):
+        #         pl = self.criterion(y_hat[i : i + 1], y[i : i + 1])
+        #         per_sample_losses.append(float(pl.detach().cpu().item()))
+        #     print(f"[DEBUG] val batch_idx={batch_idx} " \
+        #           f"per_sample_losses={per_sample_losses}")
+        # except Exception as e:
+        #     print(f"[DEBUG] per-sample loss calc failed: {e}")
 
         for i in range(y_hat.shape[0]):
             output = y_hat[i].argmax(dim=0).cpu().numpy().astype(np.uint8)

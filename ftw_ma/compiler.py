@@ -10,17 +10,10 @@ from torchgeo.trainers import BaseTask
 from torchmetrics import JaccardIndex, MetricCollection, Precision, Recall
 from tqdm import tqdm
 
-# from ftw_tools.postprocess.metrics import get_object_level_metrics
-# from ftw_tools.torchgeo.datamodules import preprocess
 from .dataset import FTWMapAfrica
-# from .trainers import CustomSemanticSegmentationTask
+from .trainers import CustomSemanticSegmentationTask
 
-# import os
-# import sys
-# import time
 import yaml
-
-# from torchgeo.datamodules import BaseDataModule
 
 from ftw.metrics import get_object_level_metrics
 # from .metrics import get_object_level_metrics
@@ -66,16 +59,6 @@ def fit(config, ckpt_path, cli_args):
         )
     finally:
         sys.argv = saved_argv
-
-    # # Run the LightningCLI with the constructed arguments
-    # cli = LightningCLI(
-    #     model_class=BaseTask,
-    #     seed_everything_default=0,
-    #     subclass_mode_model=True,
-    #     subclass_mode_data=True,
-    #     save_config_kwargs={"overwrite": True},
-    #     args=cli_args,  # Pass the constructed cli_args
-    # )
     
     print("Finished")
 
@@ -90,9 +73,6 @@ def test(
     iou_threshold,
     out,
 ):
-
-# def test(config, model_path, gpu, iou_threshold, out):
-#     """Command to test the model."""
 
     with open(config, "r") as f:
         config = yaml.safe_load(f)
@@ -153,13 +133,6 @@ def test(
     dl = DataLoader(ds, batch_size=64, shuffle=False, num_workers=12)
     print(f"Created dataloader with {len(ds)} samples in" \
           "{time.time() - tic:.2f}s")
-
-    # tic = time.time()
-
-    # dm = FTWMapAfricaDataModule(**config["data"].get("init_args"))
-    # dm.setup(stage="test")
-    # # print(f"Created dataloader with {len(ds)} samples "\
-    # #       f"in {time.time() - tic:.2f}s")
 
     metrics = MetricCollection(
         [

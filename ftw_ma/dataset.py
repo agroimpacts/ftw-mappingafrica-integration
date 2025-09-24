@@ -179,76 +179,7 @@ class FTWMapAfrica(NonGeoDataset):
         if self.transforms is not None:
             sample = self.transforms(sample)
 
-        return sample
-    
-    # def plot(self, sample: dict[str, Tensor],
-    #          bands: Optional[list] = [0, 1, 2], 
-    #          suptitle: Optional[str] = None) -> Figure:
-    #     """Plot a sample from the dataset.
-
-    #     Args:
-    #         sample: a sample return by :meth:`__getitem__`
-    #         bands: which bands to use for RGB rendering
-    #         suptitle: optional suptitle to use for figure
-
-    #     Returns:
-    #         a matplotlib Figure with the rendered sample
-    #     """
-     
-    #     def scale_image(image):
-    #         img_min, img_max = image.min(), image.max()
-    #         return (image - img_min) / (img_max - img_min)
-        
-    #     def squeezer(tensor, mask=False):
-    #         if len(tensor.shape) == 4:
-    #             if mask:
-    #                 return tensor.squeeze(0).squeeze(0)
-    #             else:
-    #                 return tensor.squeeze(0)
-    #         else: 
-    #             return tensor
-
-    #     image = squeezer(sample["image"])
-    #     mask = squeezer(sample["mask"], mask=True).numpy()
-
-    #     # If only one image (3 or 4 bands), show image and mask
-    #     if image.shape[0] <= 4:
-    #         img = image[bands].numpy().transpose(1, 2, 0)
-    #         num_panels = 2
-    #         fig, axs = plt.subplots(nrows=1, ncols=num_panels, 
-    #                                 figsize=(num_panels * 5, 8))
-    #         axs[0].imshow(scale_image(img))
-    #         axs[0].axis("off")
-    #         axs[1].imshow(mask, vmin=0, vmax=2, cmap="gray")
-    #         axs[1].axis("off")
-    #         if suptitle is not None:
-    #             plt.suptitle(suptitle)
-    #         return fig
-
-    #     else:
-    #         # Otherwise, show both images and mask
-    #         img1 = image[0:3].numpy().transpose(1, 2, 0)
-    #         img1 = scale_image(img1)
-    #         img2 = image[4:7].numpy().transpose(1, 2, 0)
-    #         img2 = scale_image(img2)
-    #         num_panels = 3
-    #         if "prediction" in sample:
-    #             num_panels += 1
-    #             predictions = sample["prediction"].numpy()
-    #         fig, axs = plt.subplots(1, num_panels, figsize=(num_panels * 5, 8))
-    #         axs[0].imshow(img1)
-    #         axs[0].axis("off")
-    #         axs[1].imshow(img2)
-    #         axs[1].axis("off")
-    #         axs[2].imshow(mask, vmin=0, vmax=2, cmap="gray")
-    #         axs[2].axis("off")
-    #         panel_id = 3
-    #         if "prediction" in sample:
-    #             axs[panel_id].imshow(predictions)
-    #             axs[panel_id].axis("off")
-    #         if suptitle is not None:
-    #             plt.suptitle(suptitle)
-    #         return fig
+        return sample    
 
     def plot(self, sample: dict[str, Tensor], 
              suptitle: Optional[str] = None) -> Figure:
