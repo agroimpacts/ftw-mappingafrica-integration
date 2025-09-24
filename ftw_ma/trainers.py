@@ -8,12 +8,13 @@ import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
 import torchvision.models as models
+# from einops import rearrange
 from matplotlib.figure import Figure
 from torch import Tensor
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchgeo.datasets import unbind_samples
-from torchgeo.models import FCN
+# from torchgeo.models import FCN, FCSiamConc, FCSiamDiff
 from torchgeo.trainers.base import BaseTask
 from torchmetrics import MetricCollection
 from torchmetrics.classification import (
@@ -139,10 +140,8 @@ class CustomSemanticSegmentationTask(BaseTask):
         loss: str = self.hparams["loss"]
         ignore_index = self.hparams["ignore_index"]
         class_weights = None
-
         if self.hparams["class_weights"] is not None:
             class_weights = torch.tensor(self.hparams["class_weights"])
-        
         if loss == "ce":
             if self.hparams["class_weights"] is not None:
                 class_weights = torch.tensor(self.hparams["class_weights"])
@@ -307,22 +306,21 @@ class CustomSemanticSegmentationTask(BaseTask):
             The loss tensor.
         """
         x = batch["image"]
-        y = batch["mask"]
+        y = batch["mask"].squeeze(1)
         y_hat = self(x)
 
         loss: Tensor = self.criterion(y_hat, y)
-        # self.log("train_loss", loss)
+
         self.log(
             "train/loss",
             loss,
             on_step=True,
             on_epoch=True,
             prog_bar=True,
-            # batch_size=x.size(0),
-            sync_dist=True
+            sync_dist=True,
         )
-        self.train_metrics.update(y_hat, y)        
-        
+        self.train_metrics.update(y_hat, y)
+
         return loss
 
     def validation_step(self, batch: Any, batch_idx: int, 
@@ -337,9 +335,6 @@ class CustomSemanticSegmentationTask(BaseTask):
         
         x = batch["image"]
         y = batch["mask"]
-        ## Attempted fix for validation loss issue
-        # y = y.long().to(x.device)
-        ##
         y_hat = self(x)
 
         loss: Tensor = self.criterion(y_hat, y)
@@ -358,9 +353,19 @@ class CustomSemanticSegmentationTask(BaseTask):
             for i in range(y_hat.shape[0]):
                 pl = self.criterion(y_hat[i : i + 1], y[i : i + 1])
                 per_sample_losses.append(float(pl.detach().cpu().item()))
-            print(f"[DEBUG] val batch_idx={batch_idx} per_sample_losses={per_sample_losses}")
+            print(f"[DEBUG] val batch_idx={batch_idx} " \
+                  "per_sample_losses={per_sample_losses}")
         except Exception as e:
             print(f"[DEBUG] per-sample loss calc failed: {e}")
+
+        for i in range(y_hat.shape[0]):
+            output = y_hat[i].argmax(dim=0).cpu().numpy().astype(np.uint8)
+            mask = y[i].cpu().numpy().astype(np.uint8)
+            tps, fps, fns = get_object_level_metrics(mask, output, 
+                                                     iou_threshold=0.5)
+            self.val_tps += tps
+            self.val_fps += fps
+            self.val_fns += fns
 
         self.log(
             "val/loss",
@@ -368,27 +373,10 @@ class CustomSemanticSegmentationTask(BaseTask):
             on_step=False,
             on_epoch=True,
             prog_bar=True,
-            # batch_size=x.size(0),
-            sync_dist=True   # good for multi-GPU, safe otherwise
+            sync_dist=True,
         )
-
-        for i in range(y_hat.shape[0]):
-            output = y_hat[i].argmax(dim=0).cpu().numpy().astype(np.uint8)
-            mask = y[i].cpu().numpy().astype(np.uint8)
-            tps, fps, fns = get_object_level_metrics(
-                mask, output, iou_threshold=0.5
-            )
-            self.val_tps += tps
-            self.val_fps += fps
-            self.val_fns += fns
-
         self.val_metrics.update(y_hat, y)
         self.val_agg.update(y_hat, y)
-        ## Attempted fix for validation loss issue
-        # preds = y_hat.argmax(dim=1)
-        # self.val_metrics.update(preds, y)
-        # self.val_agg.update(preds, y)
-        ##
 
         if (
             batch_idx < 10
@@ -424,8 +412,7 @@ class CustomSemanticSegmentationTask(BaseTask):
                         )
                 plt.close()
                 
-    def test_step(self, batch: Any, batch_idx: int, 
-                  dataloader_idx: int = 0) -> None:
+    def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> None:
         """Compute the test loss and additional metrics.
 
         Args:
@@ -434,8 +421,10 @@ class CustomSemanticSegmentationTask(BaseTask):
             dataloader_idx: Index of the current dataloader.
         """
         x = batch["image"]
-        y = batch["mask"]
+        y = batch["mask"].squeeze(1)
+
         y_hat = self(x)
+
         loss: Tensor = self.criterion(y_hat, y)
         self.log("test_loss", loss)
         self.test_metrics.update(y_hat, y)
@@ -448,10 +437,7 @@ class CustomSemanticSegmentationTask(BaseTask):
         Returns:
             Optimizer and learning rate scheduler.
         """
-
-        # Maybe add another optimizer
-        optimizer = AdamW(self.parameters(), lr=self.hparams["lr"], 
-                          amsgrad=True)
+        optimizer = AdamW(self.parameters(), lr=self.hparams["lr"], amsgrad=True)
         scheduler = CosineAnnealingLR(
             optimizer, T_max=self.hparams["patience"], eta_min=1e-6
         )
@@ -537,8 +523,7 @@ class CustomSemanticSegmentationTask(BaseTask):
             layer_w = pretrained_weights[layer_key]
             if encoder_key in model_dict:
                 if index == 0:  # pacth first conv. layer weights
-                    # Extract pre-trained weights for the first convolutional 
-                    # layer
+                    # Extract pre-trained weights for first convolutional layer
                     pretrained_conv1_weights = layer_w
                     # Retrieve the current conv1 weights
                     new_conv1_weights = model_dict[encoder_key]
@@ -568,6 +553,4 @@ class CustomSemanticSegmentationTask(BaseTask):
             model_dict.update(pretrained_dict)
             model.load_state_dict(model_dict)
         else:
-            print(f"Due to mismatch in the Tensor size, unable to patch "
-                  "weights.")
-            
+            print("Due to mismatch in the Tensor size, can't patch weights.")

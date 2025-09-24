@@ -1,23 +1,32 @@
 import os
-import sys
 import time
-import yaml
-
-# import tempfile
-from tqdm import tqdm
 
 import numpy as np
+import torch
 from lightning.pytorch.cli import LightningCLI
-
-from torchgeo.datamodules import BaseDataModule
+from torch.utils.data import DataLoader
 from torchgeo.trainers import BaseTask
 from torchmetrics import JaccardIndex, MetricCollection, Precision, Recall
+from tqdm import tqdm
+
+# from ftw_tools.postprocess.metrics import get_object_level_metrics
+# from ftw_tools.torchgeo.datamodules import preprocess
+from .dataset import FTWMapAfrica
+# from .trainers import CustomSemanticSegmentationTask
+
+# import os
+# import sys
+# import time
+import yaml
+
+# from torchgeo.datamodules import BaseDataModule
 
 from ftw.metrics import get_object_level_metrics
 # from .metrics import get_object_level_metrics
 # from PIL import Image
 
 from .trainers import *
+from .dataset import FTWMapAfrica
 from .datamodule import FTWMapAfricaDataModule
 
 def fit(config, ckpt_path, cli_args):
@@ -31,26 +40,59 @@ def fit(config, ckpt_path, cli_args):
     if ckpt_path:
         cli_args += [f"--ckpt_path={ckpt_path}"]
 
-    # Run LightningCLI by simulating sys.argv (avoid nested 
-    # Click/Lit parsing issues)
-    saved_argv = sys.argv
-    try:
-        sys.argv = [saved_argv[0]] + list(cli_args)
-        LightningCLI(
-            model_class=BaseTask,
-            datamodule_class=BaseDataModule,
-            seed_everything_default=0,
-            subclass_mode_model=True,
-            subclass_mode_data=True,
-            save_config_kwargs={"overwrite": True},
-        )
-    finally:
-        sys.argv = saved_argv
+    print(f"CLI arguments: {cli_args}")
+
+    # # Run LightningCLI by simulating sys.argv (avoid nested 
+    # # Click/Lit parsing issues)
+    # saved_argv = sys.argv
+    # try:
+    #     sys.argv = [saved_argv[0]] + list(cli_args)
+    #     LightningCLI(
+    #         model_class=BaseTask,
+    #         datamodule_class=BaseDataModule,
+    #         seed_everything_default=0,
+    #         subclass_mode_model=True,
+    #         subclass_mode_data=True,
+    #         save_config_kwargs={"overwrite": True},
+    #     )
+    # finally:
+    #     sys.argv = saved_argv
+    # Best practices for Rasterio environment variables
+    rasterio_best_practices = {
+        "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
+        "AWS_NO_SIGN_REQUEST": "YES",
+        "GDAL_MAX_RAW_BLOCK_CACHE_SIZE": "200000000",
+        "GDAL_SWATH_SIZE": "200000000",
+        "VSI_CURL_CACHE_SIZE": "200000000",
+    }
+    os.environ.update(rasterio_best_practices)
+
+    # Run the LightningCLI with the constructed arguments
+    cli = LightningCLI(
+        model_class=BaseTask,
+        seed_everything_default=0,
+        subclass_mode_model=True,
+        subclass_mode_data=True,
+        save_config_kwargs={"overwrite": True},
+        args=cli_args,  # Pass the constructed cli_args
+    )
     
     print("Finished")
 
-def test(config, model_path, gpu, iou_threshold, out):
-    """Command to test the model."""
+def test(
+    config,    
+    gpu,
+    model_path,
+    data_dir,
+    catalog,
+    split,
+    temporal_options,
+    iou_threshold,
+    out,
+):
+
+# def test(config, model_path, gpu, iou_threshold, out):
+#     """Command to test the model."""
 
     with open(config, "r") as f:
         config = yaml.safe_load(f)
@@ -79,12 +121,45 @@ def test(config, model_path, gpu, iou_threshold, out):
     print(f"Model loaded in {time.time() - tic:.2f}s")
 
     print("Creating dataloader")
+    tic = time.time()
+
+    # Image normalization arugments from the config file
+    data_args = config["data"].get("init_args")
+    normalization_strategy = data_args.get("normalization_strategy", None)
+    normalization_stat_procedure = data_args.get(
+        "normalization_stat_procedure", None
+    )
+    global_stats = data_args.get("global_stats", None) 
+    img_clip_val = data_args.get("img_clip_val", None)  
+    nodata = data_args.get("nodata", None)
+
+    print(f"normalization_strategy: {normalization_strategy}")
+    print(f"normalization_stat_procedure: {normalization_stat_procedure}")
+    print(f"global_stats: {global_stats}")  
+    print(f"img_clip_val: {img_clip_val}")
+    print(f"nodata: {nodata}")
+
+    ds = FTWMapAfrica(
+        catalog=catalog,
+        data_dir=data_dir,
+        split=split,
+        temporal_options=temporal_options,
+        normalization_strategy=normalization_strategy,
+        normalization_stat_procedure=normalization_stat_procedure,
+        global_stats=global_stats,
+        img_clip_val=img_clip_val,
+        nodata=nodata,        
+    )
+    dl = DataLoader(ds, batch_size=64, shuffle=False, num_workers=12)
+    print(f"Created dataloader with {len(ds)} samples in" \
+          "{time.time() - tic:.2f}s")
+
     # tic = time.time()
 
-    dm = FTWMapAfricaDataModule(**config["data"].get("init_args"))
-    dm.setup(stage="test")
-    # print(f"Created dataloader with {len(ds)} samples "\
-    #       f"in {time.time() - tic:.2f}s")
+    # dm = FTWMapAfricaDataModule(**config["data"].get("init_args"))
+    # dm.setup(stage="test")
+    # # print(f"Created dataloader with {len(ds)} samples "\
+    # #       f"in {time.time() - tic:.2f}s")
 
     metrics = MetricCollection(
         [
@@ -99,29 +174,24 @@ def test(config, model_path, gpu, iou_threshold, out):
             ),
         ]
     ).to(device)
-
+        
     all_tps = 0
     all_fps = 0
     all_fns = 0
-    for batch in tqdm(dm.test_dataloader(), desc="Testing"):
+    for batch in tqdm(dl):
         images = batch["image"].to(device)
         masks = batch["mask"].to(device)
         with torch.inference_mode():
-            outputs = model(images)
-
-        outputs = outputs.argmax(dim=1)
+            outputs = model(images).argmax(dim=1)
 
         new_outputs = torch.zeros(
-            outputs.shape[0], outputs.shape[1], outputs.shape[2], device=device
+            outputs.shape[0], outputs.shape[1], outputs.shape[2], 
+            device=device
         )
         new_outputs[outputs == 2] = 0  # Boundary pixels
         new_outputs[outputs == 0] = 0  # Background pixels
         new_outputs[outputs == 1] = 1  # Crop pixels
         outputs = new_outputs
-
-        metrics.update(outputs, masks)
-        outputs = outputs.cpu().numpy().astype(np.uint8)
-        masks = masks.cpu().numpy().astype(np.uint8)
 
         # Save each output and mask as an image for inspection (for check)
         # output_dir = f"{os.path.dirname(out)}/test_outputs"
@@ -136,12 +206,13 @@ def test(config, model_path, gpu, iou_threshold, out):
         #     Image.fromarray(outputs[i]).save(output_path)
         #     Image.fromarray(masks[i]).save(mask_path)        
 
+        metrics.update(outputs, masks)
+        outputs = outputs.cpu().numpy().astype(np.uint8)
+        masks = masks.cpu().numpy().astype(np.uint8)
+
         for i in range(len(outputs)):
             output = outputs[i]
             mask = masks[i]
-            # if postprocess:
-            #     post_processed_output = out.copy()
-            #     output = post_processed_output
             tps, fps, fns = get_object_level_metrics(
                 mask, output, iou_threshold=iou_threshold
             )

@@ -44,28 +44,61 @@ def model_fit(config, ckpt_path, cli_args):
 
     fit(config, ckpt_path, cli_args)
 
+# test
 @model.command("test", help="Test the model")
 @click.option(
     "--config",
-    "-c",
+    "-cfg",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
     help="Path to the config file",
 )
 @click.option(
-    "--model",
+    "--gpu",
+    type=click.IntRange(min=-1),
+    default=0,
+    show_default=True,
+    help=f"GPU to use, zero-based index. Set to -1 to use CPU."\
+        "CPU is also always used if CUDA is not available.",
+)
+@click.option(
+    "--model_path",
     "-m",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
     help="Path to model checkpoint",
 )
 @click.option(
-    "--gpu",
-    type=int,
-    default=0,
+    "--data_dir",
+    "-d",
+    type=click.Path(exists=False),
+    default="/home/airg/data/labels/cropland",
     show_default=True,
-    help=f"GPU to use, zero-based index. Set to -1 to use CPU."\
-        "CPU is also always used if CUDA is not available.",
+    help="Path to the directory containing the data",
+)
+@click.option(
+    "--catalog",
+    "-cat",
+    type=click.Path(exists=False),
+    default="../data/ftw-catalog-small.csv",
+    show_default=True,
+    help="Path to the directory containing the data",
+)
+@click.option(
+    "--split",
+    "-spl",
+    type=click.Choice(["validate", "test"]),
+    default="test",
+    show_default=True,
+    help="Choose validate or test split",
+)
+@click.option(
+    "--temporal_options",
+    "-t",
+    type=click.Choice(["stacked", "windowA", "windowB"]),
+    default="windowB",
+    show_default=True,
+    help="Temporal option",
 )
 @click.option(
     "--iou_threshold",
@@ -79,22 +112,35 @@ def model_fit(config, ckpt_path, cli_args):
     "--out",
     "-o",
     type=click.Path(exists=False),
-    default="metrics.json",
+    default="metrics.csv",
     show_default=True,
     help="Output file for metrics",
 )
-# @click.option(
-#     "--temporal_options",
-#     "-t",
-#     type=click.Choice(TEMPORAL_OPTIONS),
-#     default="stacked",
-#     show_default=True,
-#     help="Temporal option",
-# )
-def model_test(config, model, gpu, iou_threshold, out):
+
+def model_test(
+    config,    
+    gpu,
+    model_path,
+    data_dir,
+    catalog,
+    split,
+    temporal_options,
+    iou_threshold,
+    out,
+):
     from .compiler import test
 
-    test(config, model, gpu, iou_threshold, out)
+    test(
+        config,    
+        gpu,
+        model_path,
+        data_dir,
+        catalog,
+        split,
+        temporal_options,
+        iou_threshold,
+        out,
+    )
 
 if __name__ == "__main__":
     ftw_ma()
