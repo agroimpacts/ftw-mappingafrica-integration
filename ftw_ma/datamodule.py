@@ -1,12 +1,18 @@
 # FTWMapAfricaDataModule for managing data loading and augmentation
 from typing import Optional, Union, Dict, Any, Tuple, List
+import kornia
 import kornia.augmentation as K
+import kornia.constants
+import torch
+from lightning import LightningDataModule
+from matplotlib.figure import Figure
+from torch import Tensor
+from torch.utils.data import DataLoader, Subset
 from torchgeo.transforms import SatSlideMix
-from torchgeo.datamodules import NonGeoDataModule
-from typing import Optional
+# from torchgeo.datamodules import NonGeoDataModule
 from .dataset import FTWMapAfrica
 
-class FTWMapAfricaDataModule(NonGeoDataModule):
+class FTWMapAfricaDataModule(LightningDataModule):
     """
     Data module for FTW Mapping Africa, managing datasets and
     augmentations.
@@ -41,10 +47,6 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         if "split" in kwargs:
             raise ValueError("Cannot specify split in FTWDataModule")
         
-         # normalize aug_list string "None" -> None
-        # if isinstance(aug_list, str) and aug_list.lower() == "none":
-        #     aug_list = None
-
         # ---- normalize inputs BEFORE calling super() ----
         # prefer explicit kwargs over possible duplicates inside kwargs
         if "aug_list" in kwargs and aug_list is None:
@@ -83,17 +85,13 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         kwargs.pop("normalization_stat_procedure", None)  
         # print(kwargs)      
         
-        super().__init__(FTWMapAfrica, batch_size, num_workers, **kwargs)
+        # super().__init__(FTWMapAfrica, batch_size, num_workers, **kwargs)
+        super().__init__()
+        if "split" in kwargs:
+            raise ValueError("Cannot specify split in FTWDataModule")
 
-        # # Only include RandomGamma if normalization_strategy is 'min_max'
-        # normalization_strategy = kwargs.get("normalization_strategy", None)
-
-        # # also accept string "None" from YAML by converting to actual None
-        # if isinstance(aug_list, str) and aug_list.lower() == "none":
-        #     self.train_aug = None
-        
-        # elif (aug_list == [] or aug_list is None):
-        #     self.train_aug = None
+        self.batch_size = batch_size
+        self.num_workers = num_workers
         self.global_stats = global_stats
         self.normalization_strategy = normalization_strategy
         self.normalization_stat_procedure = normalization_stat_procedure
@@ -135,36 +133,24 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         photometric_augs = ["sharpness", "brightness", "contrast", 
                             "gaussian_noise"]
         
-        # if "gamma" in aug_list and normalization_strategy != "min_max":
-        #     print(f"Warning: 'gamma' augmentation requires 'min_max'" \
-        #         f"normalization. Skipping 'gamma'.")
         if "gamma" in (self.aug_list or []) \
             and self.normalization_strategy != "min_max":
              print(f"Warning: 'gamma' augmentation requires 'min_max'" \
                    f"normalization. Skipping 'gamma'.")            
+
         # Build selected_augs in the desired order
-        # selected_augs = []
-        # # Add geometric augmentations first
-        # selected_augs += [available_augs[name] for name in geometric_augs 
-        #                 if name in aug_list and name in available_augs]
+        # Add geometric augmentations first
         selected_augs = []
         # Add geometric augmentations first
         selected_augs += [available_augs[name] for name in geometric_augs
                           if (self.aug_list and name in self.aug_list) 
                           and name in available_augs]
         # Add gamma if present
-        # if "gamma" in aug_list and "gamma" in available_augs and \
-        #     normalization_strategy == "min_max":
-        #     selected_augs.append(available_augs["gamma"])
         if (self.aug_list and "gamma" in self.aug_list) \
             and "gamma" in available_augs \
                 and self.normalization_strategy == "min_max":
              selected_augs.append(available_augs["gamma"])
         
-        # Add photometric augmentations
-        # selected_augs += [available_augs[name] for name in photometric_augs 
-        #                 if name in aug_list and name in available_augs]
-        # print(selected_augs)
         # Add photometric augmentations
         selected_augs += [available_augs[name] for name in photometric_augs
                           if (self.aug_list and name in self.aug_list) 
@@ -175,10 +161,8 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
             data_keys=None,
             keepdim=True,
         )
-        # print(self.train_aug)
-        # print(self.normalization_strategy)
-        # print(self.normalization_stat_procedure)
-        # print(self.global_stats)
+        print(self.train_aug)
+        # self.aug = None  # we just want normalization for val/test
         self.kwargs = kwargs
 
     def setup(self, stage: str):
@@ -186,13 +170,15 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
         Set up datasets for the specified stage ('fit', 'validate',
         'test').
         """
+        # remember current stage so helpers can behave accordingly
+        self.stage = stage
         if stage == "fit":
             self.train_dataset = FTWMapAfrica(
                 split="train",
                 normalization_strategy=self.normalization_strategy, 
                 normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
-                transforms=self.train_aug,
+                # transforms=self.train_aug,
                 **self.kwargs,
             )
         if stage in ["fit", "validate"]:
@@ -201,7 +187,7 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
                 normalization_strategy=self.normalization_strategy, 
                 normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
-                transforms=None,
+                # transforms=None,
                 **self.kwargs,
             )
         if stage == "test":
@@ -210,7 +196,69 @@ class FTWMapAfricaDataModule(NonGeoDataModule):
                 normalization_strategy=self.normalization_strategy, 
                 normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
-                transforms=None,
+                # transforms=None,
                 **self.kwargs,
             )
 
+    def train_dataloader(self) -> Any:
+        return DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+        )
+
+    def val_dataloader(self) -> Any:
+        return DataLoader(
+            dataset=self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+        )
+
+    def test_dataloader(self) -> Any:
+        return DataLoader(
+            dataset=self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            persistent_workers=True,
+        )
+
+    def on_after_batch_transfer(self, batch: dict[str, Tensor], 
+                                dataloader_idx: int):
+        if self.trainer:
+            if self.trainer.training:
+                batch = self.train_aug(batch)
+            # else:
+            #     batch = self.aug(batch)
+        return batch
+
+    def plot(self, *args: Any, **kwargs: Any):
+        fig: Figure | None = None
+        dataset = self.val_dataset
+        if isinstance(dataset, Subset):
+            dataset = dataset.dataset
+        if dataset is not None:
+            if hasattr(dataset, "plot"):
+                fig = dataset.plot(*args, **kwargs)
+        return fig
+    
+    def apply_train_aug(self, batch: dict[str, Tensor], 
+                        seed: int | None = None):
+        """Apply the configured train_aug to a single batched dict for 
+        interactive use. batch must be batched (batch dimension present). 
+        If seed provided, set deterministic seeds."""
+        # Only apply train augmentations when datamodule is set for training.
+        # If inspecting validate/test datasets, return original batch unchanged.
+        if getattr(self, "stage", None) not in ("fit", "train"):
+            # If stage is 'validate' or 'test' do not apply train augmentations.
+            return batch
+        if seed is not None:
+            import random, numpy as _np, torch as _torch
+            random.seed(seed); _np.random.seed(seed); _torch.manual_seed(seed)
+        if self.train_aug is None:
+            return batch
+        return self.train_aug(batch)
