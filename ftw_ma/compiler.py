@@ -59,7 +59,6 @@ def fit(config, ckpt_path, cli_args):
         sys.argv = [saved_argv[0]] + list(cli_args)
         LightningCLI(
             model_class=BaseTask,
-            datamodule_class=BaseDataModule,
             seed_everything_default=0,
             subclass_mode_model=True,
             subclass_mode_data=True,
