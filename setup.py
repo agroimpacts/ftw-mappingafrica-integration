@@ -10,7 +10,7 @@ setup(
     packages=find_packages(), #(where="ftw_ma"),
     include_package_data=True,
     install_requires=[
-        "ftw-tools==1.4.3",
+        "ftw-tools",
         "ipykernel",
         "leafmap",
         "localtileserver",
