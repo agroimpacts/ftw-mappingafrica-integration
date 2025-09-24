@@ -161,7 +161,7 @@ class FTWMapAfricaDataModule(LightningDataModule):
             data_keys=None,
             keepdim=True,
         )
-        print(self.train_aug)
+        # print(self.train_aug)
         # self.aug = None  # we just want normalization for val/test
         self.kwargs = kwargs
 
