@@ -354,7 +354,7 @@ class CustomSemanticSegmentationTask(BaseTask):
                 pl = self.criterion(y_hat[i : i + 1], y[i : i + 1])
                 per_sample_losses.append(float(pl.detach().cpu().item()))
             print(f"[DEBUG] val batch_idx={batch_idx} " \
-                  "per_sample_losses={per_sample_losses}")
+                  f"per_sample_losses={per_sample_losses}")
         except Exception as e:
             print(f"[DEBUG] per-sample loss calc failed: {e}")
 
