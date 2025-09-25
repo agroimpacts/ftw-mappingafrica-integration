@@ -193,13 +193,13 @@ class FTWMapAfrica(NonGeoDataset):
             a matplotlib Figure with the rendered sample
         """
         img1 = sample["image"][0:3].numpy().transpose(1, 2, 0)
-        print("Image shape: ", img1.shape)
+        # print("Image shape: ", img1.shape)
 
         if self.temporal_options == "stacked": 
             print("Plotting stacked images")
             img2 = sample["image"][4:7]
             img2 = img2.numpy().transpose(1, 2, 0)
-            print("Image shape: ", img2.shape)
+            # print("Image shape: ", img2.shape)
 
         mask = sample["mask"].numpy().squeeze()
         num_panels = 3 if self.temporal_options in ("stacked", "rgb") else 2
