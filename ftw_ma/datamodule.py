@@ -53,21 +53,28 @@ class FTWMapAfricaDataModule(LightningDataModule):
             aug_list = kwargs.pop("aug_list")
         if "global_stats" in kwargs and global_stats is None:
             global_stats = kwargs.pop("global_stats")
-        if "normalization_strategy" in kwargs \
-            and normalization_strategy == "min_max":
+        if "normalization_strategy" in kwargs:
             normalization_strategy = kwargs.pop("normalization_strategy")
-        if "normalization_stat_procedure" in kwargs \
-            and normalization_stat_procedure == "gpb":
-            normalization_stat_procedure = \
-                kwargs.pop("normalization_stat_procedure")
+        if "normalization_stat_procedure" in kwargs:
+            normalization_stat_procedure = kwargs.pop("normalization_stat_procedure")
 
         # normalize global_stats (accept dict/list/tuple)
         if isinstance(global_stats, dict):
-            mean = global_stats.get("mean")
-            std = global_stats.get("std")
-            try:
-                global_stats = {"mean": list(mean), "std": list(std)}
-            except Exception:
+            if normalization_strategy.startswith("z"):
+                mean = global_stats.get("mean")
+                std = global_stats.get("std")
+                try:
+                    global_stats = {"mean": list(mean), "std": list(std)}
+                except Exception:
+                    global_stats = None
+            elif normalization_strategy == "min_max":
+                min_ = global_stats.get("min")
+                max_ = global_stats.get("max")
+                try:
+                    global_stats = {"min": list(min_), "max": list(max_)}
+                except Exception:
+                    global_stats = None
+            else:
                 global_stats = None
         elif isinstance(global_stats, (list, tuple)) and len(global_stats) == 2:
             try:
@@ -77,6 +84,10 @@ class FTWMapAfricaDataModule(LightningDataModule):
                         else {"min": list(a), "max": list(b)}
             except Exception:
                 global_stats = None
+
+        print(f"Using normalization_strategy='{normalization_strategy}', ")
+        print(f"normalization_stat_procedure='{normalization_stat_procedure}'")
+        print(f"global_stats={global_stats}")
 
         # remove any keys we normalized so parent doesn't get unexpected objects
         kwargs.pop("aug_list", None)
