@@ -82,10 +82,19 @@ Data classes based on those in `ftw-baselines` and `torchgeo` are used here, bas
 From the CLI, the model can be trained as follows:
 
 ```bash
-ftw_ma model fit -c configs/config.yaml
+ftw_ma model fit -c configs/<config-file>.yaml
 ```
 
-See the [example config](configs/example-config.yaml) for settings. 
+See the [example config](configs/example-config.yaml) for settings.
+
+<config-file>.yaml should be named to be informative of the experiment, e.g. `fullcat-ftwbaseline-exp2.yaml` for the second experiment using the full combined catalog and FTW Baseline model.
+
+To resume training from a specific checkpoint:
+
+```bash
+CKPT=/path/to/checkpoint/checkpoint.ckpt
+ftw_ma model fit -c configs/<config-file>.yaml --ckpt_path $CKPT
+```
 
 To test the model:
 
@@ -93,3 +102,15 @@ To test the model:
 CHKPT=/path/to/checkpoint/checkpoint.ckpt 
 ftw_ma model test -c configs/config.yaml -m $CHKPT --gpu 0 -o metrics.json
 ```
+
+Or run the `tester.sh` script:
+
+```bash
+# from project root
+./scripts/tester.sh <model_dir_name> <version_number> <catalog>
+```
+
+<moidel_dir_name> is the name of the model directory under `~/working/models/`, e.g. `fullcat-ftwbaseline-exp2` where the model checkpoint is stored. <version_number> is the version number of the training run, specified explicitly as an integer, or if left empty the latest version is found and run. <catalog> is the path to the catalog CSV file, e.g. `data/ftw-mappingafrica-combined-catalog.csv`. 
+
+This will produce an output metrics file in a specified directory, with a file name composed of the experiment name and catalog used in testing. The script is currently hard-coded for the validation split.
+
