@@ -144,7 +144,6 @@ class FTWMapAfrica(NonGeoDataset):
                 global_stats=self.global_stats,
                 clip_val=self.img_clip_val
             )           
-            # images.append(array_to_tensor(window_a_img).float())
             images.append(window_a_img)
 
         if self.temporal_options in ("stacked", "windowB"):
@@ -157,18 +156,13 @@ class FTWMapAfrica(NonGeoDataset):
                 global_stats=self.global_stats,
                 clip_val=self.img_clip_val
             )
-            # images.append(array_to_tensor(window_b_img).float())      
             images.append(window_b_img)
 
         # image = torch.cat(images, dim=0)
         image = np.concatenate(images, axis=0).astype(np.float32)
         image = torch.from_numpy(image).float()
 
-        # Load label mask
-        # with rasterio.open(filenames["mask"]) as f:
-        #     array: np.typing.NDArray[np.int_] = f.read(1)
-        #     mask = torch.from_numpy(array).long()
-
+        # Load mask
         with rasterio.open(filenames["mask"]) as f:
             mask = f.read(1)
         mask = torch.from_numpy(mask).long()
