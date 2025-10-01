@@ -1,5 +1,6 @@
 # FTWMapAfrica dataset class for loading and processing field boundary imagery 
 # and labels.
+import os
 from pathlib import Path
 import random
 from matplotlib import colors
@@ -16,21 +17,89 @@ from torch import Tensor
 from torchgeo.datasets import NonGeoDataset, RasterDataset
 from .utils import * 
 
-class SingleRasterDataset(RasterDataset):
-    """A torchgeo dataset that loads a single raster file."""
+# class SingleRasterDataset(RasterDataset):
+#     """A torchgeo dataset that loads a single raster file."""
 
-    def __init__(self, fn: str, transforms: Optional[Callable] = None):
+#     def __init__(self, fn: str, transforms: Optional[Callable] = None):
+#         """Initialize the SingleRasterDataset class.
+
+#         Args:
+#             fn (str): The path to the raster file.
+#             transforms (Optional[Callable], optional): The transforms to apply 
+#                 to the raster file. Defaults to None.
+#         """
+#         path = os.path.abspath(fn)
+#         self.filename_regex = os.path.basename(path)
+#         super().__init__(paths=os.path.dirname(path), transforms=transforms)
+
+class SingleRasterDataset(RasterDataset):
+    """A torchgeo dataset that loads a single raster file with custom 
+    normalization."""
+
+    def __init__(
+        self, 
+        fn: str, 
+        transforms: Optional[Callable] = None,
+        normalization_strategy: str = "min_max",
+        normalization_stat_procedure: str = "lab", 
+        global_stats: Optional[Union[Dict[str, Any], Tuple, List]] = None,
+        img_clip_val: float = 0,
+        nodata: Optional[List] = None,
+    ):
         """Initialize the SingleRasterDataset class.
 
         Args:
             fn (str): The path to the raster file.
             transforms (Optional[Callable], optional): The transforms to apply 
                 to the raster file. Defaults to None.
+            normalization_strategy (str): Normalization approach ('min_max' or 
+                'z_value').
+            normalization_stat_procedure (str): Procedure normalization stats. 
+                "lab", "gab", "lpb", "gpb"
+            global_stats (dict/tuple/list, optional): Precomputed global stats.
+            img_clip_val (float): Percent value to clip image data at tails.
+            nodata (list, optional): List of nodata values to mask out.
         """
         path = os.path.abspath(fn)
         self.filename_regex = os.path.basename(path)
+        
+        # Store normalization parameters
+        self.normalization_strategy = normalization_strategy
+        self.normalization_stat_procedure = normalization_stat_procedure
+        self.global_stats = global_stats
+        self.img_clip_val = img_clip_val
+        self.nodata = nodata or [0, 65535]
+        
         super().__init__(paths=os.path.dirname(path), transforms=transforms)
 
+    def __getitem__(self, query):
+        """Override to apply custom normalization using load_image approach."""
+        # Get the raw sample from parent (loads raster data without normalization)
+        sample = super().__getitem__(query)
+        
+        # Extract image tensor - RasterDataset typically returns (C, H, W) tensors
+        image_tensor = sample["image"]
+        
+        # Convert tensor to numpy for our load_image normalization
+        if isinstance(image_tensor, torch.Tensor):
+            image_np = image_tensor.detach().cpu().numpy()
+        else:
+            image_np = np.asarray(image_tensor)
+        
+        # Apply our custom normalization (skip file loading since we have the array)
+        normalized_image = normalize_image(
+            img=image_np,
+            strategy=self.normalization_strategy,
+            procedure=self.normalization_stat_procedure,
+            global_stats=self.global_stats,
+            clip_val=self.img_clip_val,
+            nodata=self.nodata,
+        )
+        
+        # Convert back to tensor and update sample
+        sample["image"] = torch.from_numpy(normalized_image).float()
+        
+        return sample
 
 class FTWMapAfrica(NonGeoDataset):
     """
