@@ -199,6 +199,13 @@ def normalize_image(
                 img_std += epsilon
             normal_img = (img - img_mean) / img_std
 
+    print(f"normalize_image called with:")
+    print(f"  strategy: {strategy}")
+    print(f"  procedure: {procedure}")
+    print(f"  global_stats: {global_stats}")
+    print(f"  input shape: {img.shape}")
+    print(f"  input range: [{img.min():.2f}, {img.max():.2f}]")
+    print(f"  output range: [{normal_img.min():.2f}, {normal_img.max():.2f}]")
     return normal_img
 
 def show_augmented_variants(

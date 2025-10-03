@@ -1,7 +1,8 @@
 # import datetime
 # import enum
-# import json
+import json
 # import os
+import pandas as pd
 from pathlib import Path
 from typing import Optional
 import click
@@ -142,43 +143,11 @@ def model_test(
         out,
     )
 
-@model.command("predict", help="Run inference on new data")
-    """
-    CLI command to run inference imagery.
-    This command supports running predictions on:
-    - Single raster files (.tif, .vrt)
-    - Batch processing from CSV/GeoJSON/ESRI Shapefile containing file paths
-    - Directories of input files
-    Parameters
-    ----------
-    input : str
-        Input source. Can be a raster file (.tif/.vrt), a CSV/GeoJSON/Shapefile
-        with file paths, or a directory.
-    model : str
-        Path to the trained model checkpoint (.ckpt).
-    output : str, optional
-        Output file path for single input, or directory for batch processing.
-    path_column : str, default="path"
-        Column name for file paths in DataFrame/GeoDataFrame inputs.
-    geometry_column : str, default="geometry"
-        Column name for geometries in GeoDataFrame inputs.
-    id_column : str, optional
-        Column name for unique IDs (optional).
-    crop_to_geometry : bool, default=True
-        Whether to crop predictions to geometry bounds (GeoDataFrame only).
-    buffer_pixels : int, default=64
-        Buffer size around geometry in pixels.
-    Notes
-    -----
-    - For raster input, predictions are saved as a new raster file.
-    - For DataFrame/GeoDataFrame input, predictions are saved in the specified
-    output directory.
-    - Additional keyword arguments (**kwargs) are passed to the inference
-    function.
-    """`
+@model.command("predict", help="Run inference on CSV catalog")
 @click.option(
-    "--input", "-i", required=True,
-    help="Input: raster (.tif/.vrt), CSV/GeoJSON w/file paths, or \directory"
+    "--catalog", "-c", required=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="CSV catalog with file paths"
 )
 @click.option(
     "--model", "-m", required=True,
@@ -186,81 +155,298 @@ def model_test(
     help="Path to trained model checkpoint (.ckpt)"
 )
 @click.option(
-    "--output", "-o", type=click.Path(),
-    help="Output: file for single input, directory for batch processing"
+    "--output", "-o", required=True,
+    type=click.Path(),
+    help="Output directory for predictions"
 )
 @click.option(
-    "--path_column", default="path", show_default=True,
-    help="Column name for file paths (DataFrame/GeoDataFrame)"
+    "--data_dir", "-d", required=True,
+    type=click.Path(exists=True),
+    help="Base directory containing the image files"
 )
 @click.option(
-    "--geometry_column", default="geometry", show_default=True,
-    help="Column name for geometries (GeoDataFrame)"
+    "--path_column", default="window_b", show_default=True,
+    help="Column name for file paths in CSV (e.g., 'window_a', 'window_b')"
 )
 @click.option(
-    "--id_column", help="Column name for unique IDs (optional)"
+    "--id_column", default="name", show_default=True,
+    help="Column name for unique IDs in CSV"
 )
 @click.option(
-    "--crop_to_geometry/--no-crop", default=True, show_default=True,
-    help="Crop predictions to geometry bounds (GeoDataFrame only)"
+    "--split", type=str,
+    help="Filter CSV to specific split (optional)"
+)
+# Normalization options to match training
+@click.option(
+    "--normalization_strategy", 
+    type=click.Choice(["min_max", "z_value"]), 
+    default="min_max", show_default=True,
+    help="Normalization strategy (should match training)"
 )
 @click.option(
-    "--buffer_pixels", type=int, default=64, show_default=True,
-    help="Buffer around geometry in pixels"
+    "--normalization_stat_procedure", 
+    type=click.Choice(["lab", "lpb", "gab", "gpb"]), 
+    default="lab", show_default=True,
+    help="Statistics procedure (should match training)"
 )
-# ... existing options ...
+@click.option(
+    "--img_clip_val", type=float, default=0, show_default=True,
+    help="Image clipping value (should match training)"
+)
+@click.option(
+    "--global_stats", type=str, 
+    help="Global stats as JSON string, e.g., "
+         "'{\"mean\": [0,0,0,0], \"std\": [3000,3000,3000,3000]}'"
+)
+@click.option(
+    "--nodata", type=str, default="[null, 65535]", show_default=True,
+    help="Nodata values as JSON list, e.g., '[null, 65535]'"
+)
+# Band ordering option
+@click.option(
+    "--band_order", type=str,
+    help="Band reordering: 'bgr_to_rgb' to convert BGR-NIR to RGB-NIR, "
+         "or comma-separated indices like '0,1,2,3' for custom order, "
+         "or leave empty for no reordering"
+)
+# Inference parameters
+@click.option(
+    "--gpu", type=click.IntRange(min=-1), default=0, show_default=True,
+    help="GPU device ID (-1 for CPU)"
+)
+@click.option(
+    "--patch_size", type=click.IntRange(min=64), 
+    help="Patch size for inference (auto-detected if not specified)"
+)
+@click.option(
+    "--batch_size", type=int, default=1, show_default=True,
+    help="Batch size for inference"
+)
+@click.option(
+    "--num_workers", type=int, default=0, show_default=True,
+    help="Number of worker processes"
+)
+@click.option(
+    "--padding", type=int,
+    help="Padding size for patches (auto-calculated if not specified)"
+)
+@click.option(
+    "--save_scores", is_flag=True,
+    help="Save probability scores instead of class predictions"
+)
+@click.option(
+    "--overwrite", "-f", is_flag=True, 
+    help="Overwrite existing output files"
+)
+@click.option(
+    "--mps_mode", is_flag=True,
+    help="Use MPS (Apple Silicon) acceleration"
+)
 def model_predict(
-    input, model, output, path_column, geometry_column, id_column,
-    crop_to_geometry, buffer_pixels, **kwargs
+    catalog, model, output, data_dir, path_column, id_column, split,
+    normalization_strategy, normalization_stat_procedure, img_clip_val, 
+    global_stats, nodata, band_order, gpu, 
+    patch_size, batch_size, #resize_factor, 
+    num_workers, 
+    padding, save_scores, overwrite, mps_mode
 ):
-    """Run inference on raster files or batch process from DataFrame/
-    GeoDataFrame."""
-    from .inference import run_batch_inference
-    import pandas as pd
-    import geopandas as gpd
+    """Run batch inference from CSV catalog."""
+    from .inference import load_model, inference_run_single
+    import torch
 
-    # Determine input type
-    input_path = Path(input)
+    # Parse JSON strings for complex parameters
+    parsed_global_stats = None
+    if global_stats:
+        try:
+            parsed_global_stats = json.loads(global_stats)
+            print(f"Parsed global_stats: {parsed_global_stats}")
+        except json.JSONDecodeError:
+            raise click.BadParameter(
+                f"Invalid JSON for global_stats: {global_stats}"
+            )
+    
+    parsed_nodata = None
+    if nodata:
+        try:
+            parsed_nodata = json.loads(nodata)
+            # Convert JSON null to Python None
+            parsed_nodata = [None if x is None else x for x in parsed_nodata]
+            print(f"Parsed nodata: {parsed_nodata}")
+        except json.JSONDecodeError:
+            raise click.BadParameter(f"Invalid JSON for nodata: {nodata}")
 
-    if input_path.suffix.lower() in ['.tif', '.vrt']:
-        # Single raster file
-        if not output:
-            output = (
-                input_path.parent / f"prediction_{input_path.stem}.tif"
+    # Parse band_order parameter
+    parsed_band_order = None
+    if band_order:
+        if band_order == "bgr_to_rgb":
+            parsed_band_order = "bgr_to_rgb"
+            print("Using BGR to RGB conversion")
+        elif "," in band_order:
+            # Parse comma-separated indices
+            try:
+                parsed_band_order = [int(x.strip()) for x in band_order.split(",")]
+                print(f"Using custom band order: {parsed_band_order}")
+            except ValueError:
+                raise click.BadParameter(
+                    f"Invalid band order format: {band_order}. "
+                    "Use comma-separated integers like '0,1,2,3'"
+                )
+        else:
+            raise click.BadParameter(
+                f"Invalid band_order: {band_order}. "
+                "Use 'bgr_to_rgb' or comma-separated indices like '0,1,2,3'"
             )
 
-        run_batch_inference(
-            input_data=str(input_path),
-            model=model,
-            output_dir=str(Path(output).parent),
-            **kwargs
-        )
-
-    elif input_path.suffix.lower() in ['.csv', '.geojson', '.shp']:
-        # DataFrame/GeoDataFrame
-        if not output:
-            output = input_path.parent / "predictions"
-
-        # Load data
-        if input_path.suffix.lower() == '.csv':
-            data = pd.read_csv(input_path)
-        else:
-            data = gpd.read_file(input_path)
-
-        run_batch_inference(
-            input_data=data,
-            model=model,
-            output_dir=str(output),
-            path_column=path_column,
-            geometry_column=geometry_column,
-            id_column=id_column,
-            crop_to_geometry=crop_to_geometry,
-            buffer_pixels=buffer_pixels,
-            **kwargs
-        )
-        
+    # Setup device ONCE
+    if mps_mode:
+        assert torch.backends.mps.is_available(), "MPS mode is not available."
+        device = torch.device("mps")
+    elif torch.cuda.is_available() and gpu >= 0:
+        device = torch.device(f"cuda:{gpu}")
     else:
-        raise click.BadParameter(f"Unsupported input type: {input_path.suffix}")
+        device = torch.device("cpu")
+    
+    print(f"Using device: {device}")
+    
+    # Load model ONCE at the beginning
+    print("🤖 Loading model (this will only happen once)...")
+    model_net = load_model(model, device)
+    print("✅ Model loaded successfully!")
+
+    # Load and filter CSV
+    print(f"Loading CSV catalog: {catalog}")
+    df = pd.read_csv(catalog)
+    print(f"Loaded CSV with {len(df)} rows")
+    
+    # Filter by split if specified
+    if split and 'split' in df.columns:
+        df = df[df['split'] == split]
+        print(f"Filtered to {len(df)} rows for split '{split}'")
+    
+    # Validate required columns
+    if path_column not in df.columns:
+        available_cols = list(df.columns)
+        raise click.BadParameter(
+            f"Column '{path_column}' not found in CSV. "
+            f"Available columns: {available_cols}"
+        )
+    
+    if id_column and id_column not in df.columns:
+        print(f"Warning: ID column '{id_column}' not found, using row index")
+        id_column = None
+    
+    # Create output directory
+    output_dir = Path(output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Output directory: {output_dir}")
+    
+    # Process each file
+    results = []
+    data_dir_path = Path(data_dir)
+    
+    print(f"\n🚀 Starting batch inference on {len(df)} files...")
+    
+    for idx, row in df.iterrows():
+        try:
+            # Get file path
+            file_path = row[path_column]
+            if pd.isna(file_path):
+                print(f"Skipping row {idx}: missing file path")
+                continue
+            
+            # Resolve full path
+            full_path = data_dir_path / file_path
+            if not full_path.exists():
+                print(f"Warning: File not found: {full_path}")
+                results.append({
+                    'row_index': idx,
+                    'file_path': str(file_path),
+                    'full_path': str(full_path),
+                    'success': False,
+                    'error': 'File not found'
+                })
+                continue
+            
+            # Debug: Check what's actually in the file before inference
+            print(f"Debug: Checking file {full_path}")
+            try:
+                import rasterio
+                with rasterio.open(full_path) as src:
+                    # Read a small sample to check values
+                    sample = src.read(1, window=rasterio.windows.Window(0, 0, 10, 10))
+                    print(f"  File shape: {src.shape}")
+                    print(f"  File dtype: {src.dtypes}")
+                    print(f"  File nodata: {src.nodata}")
+                    print(f"  Sample values: min={sample.min()}, max={sample.max()}")
+                    print(f"  Sample dtype: {sample.dtype}")
+            except Exception as e:
+                print(f"  Error reading file directly: {e}")
+            
+            # Generate output filename
+            file_id = row[id_column] if id_column else f"row_{idx}"
+            output_filename = f"prediction_{file_id}.tif"
+            output_file = output_dir / output_filename
+            
+            print(f"Processing {file_id}: {file_path}")
+            
+            # Run inference with pre-loaded model
+            # Note: patch_size, batch_size, num_workers, padding are ignored in 
+            # simplified version
+            success = inference_run_single(
+                input_file=str(full_path),
+                model_net=model_net,  # Pre-loaded model
+                device=device,
+                out=str(output_file),
+                save_scores=save_scores,
+                normalization_strategy=normalization_strategy,
+                normalization_stat_procedure=normalization_stat_procedure,
+                global_stats=parsed_global_stats,
+                img_clip_val=img_clip_val,
+                nodata=parsed_nodata,
+                overwrite=overwrite,
+                patch_size=patch_size,   # Can be None for auto-determination
+                buffer_size=padding,     # Use padding as buffer size
+                band_order=parsed_band_order,  # Add band order parameter
+            )
+            
+            results.append({
+                'row_index': idx,
+                'file_id': file_id,
+                'file_path': str(file_path),
+                'full_path': str(full_path),
+                'output_path': str(output_file),
+                'success': success
+            })
+            
+            if success:
+                print(f"  ✓ Success: {output_filename}")
+            else:
+                print(f"  ✗ Failed: {file_path}")
+            
+        except Exception as e:
+            print(f"  ✗ Error processing row {idx}: {e}")
+            import traceback
+            print(f"  Full traceback: {traceback.format_exc()}")
+            results.append({
+                'row_index': idx,
+                'file_path': str(row.get(path_column, 'unknown')),
+                'success': False,
+                'error': str(e)
+            })
+    
+    # Save results summary
+    results_df = pd.DataFrame(results)
+    results_file = output_dir / "inference_results.csv"
+    results_df.to_csv(results_file, index=False)
+    
+    # Print summary
+    total_files = len(results)
+    successful = results_df['success'].sum()
+    print(f"\n📊 Batch inference summary:")
+    print(f"  Total files: {total_files}")
+    print(f"  Successful: {successful}")
+    print(f"  Failed: {total_files - successful}")
+    print(f"  Results saved to: {results_file}")
 
 if __name__ == "__main__":
     ftw_ma()
