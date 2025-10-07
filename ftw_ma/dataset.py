@@ -1,5 +1,6 @@
 # FTWMapAfrica dataset class for loading and processing field boundary imagery 
 # and labels.
+import os
 from pathlib import Path
 import random
 from matplotlib import colors
@@ -14,23 +15,114 @@ from skimage.exposure import rescale_intensity
 from torch import Tensor
 # from torchgeo.datasets.utils import array_to_tensor
 from torchgeo.datasets import NonGeoDataset, RasterDataset
-from .utils import * 
+from .normalize import normalize_image
 
-class SingleRasterDataset(RasterDataset):
-    """A torchgeo dataset that loads a single raster file."""
+def load_image(
+    filename,
+    nodata_val_ls=None,
+    apply_normalization=False,
+    normal_strategy="min_max",
+    stat_procedure="lab",
+    global_stats=None,
+    clip_val=0,
+):
+    """
+    Load and preprocess an image.
 
-    def __init__(self, fn: str, transforms: Optional[Callable] = None):
-        """Initialize the SingleRasterDataset class.
+    Args:
+        filename (str): Filename of the image.
+        nodata_val_ls (list, optional): List of no data value for each band.
+        apply_normalization (bool, optional): Whether to apply normalization.
+        normal_strategy (str, optional): Normalization strategy.
+        stat_procedure (str, optional): Statistic procedure to be used for
+            normalization.
+        global_stats (tuple, list, optional): Global stats for normalization.
+        clip_val (float, optional): Clipping value for normalization.
 
-        Args:
-            fn (str): The path to the raster file.
-            transforms (Optional[Callable], optional): The transforms to apply 
-                to the raster file. Defaults to None.
+    Returns:
+        np.ndarray: Loaded and preprocessed image as a numpy array.
+    """
+    with rasterio.open(filename, "r") as f:
+        img = f.read()
+
+    img = img.astype(np.float32)
+
+    if apply_normalization:
+        img = normalize_image(
+            img,
+            strategy=normal_strategy,
+            procedure=stat_procedure,
+            global_stats=global_stats,
+            clip_val=clip_val,
+            nodata=nodata_val_ls,
+        )
+
+    return img
+
+# ... rest of the dataset.py code remains the same ...
+class SimpleRasterDataset:
+    """A simple dataset that reads raster files directly with rasterio."""
+    
+    def __init__(
+        self,
+        file_path: str,
+        normalization_strategy: str = "min_max",
+        normalization_stat_procedure: str = "lab",
+        global_stats: Optional[Union[Dict[str, Any], Tuple, List]] = None,
+        img_clip_val: float = 0,
+        nodata: Optional[List] = None,
+    ):
+        """Initialize the SimpleRasterDataset."""
+        self.file_path = file_path
+        self.normalization_strategy = normalization_strategy
+        self.normalization_stat_procedure = normalization_stat_procedure
+        self.global_stats = global_stats
+        self.img_clip_val = img_clip_val
+        self.nodata = nodata or [65535]
+        
+        # Read the image and store it
+        with rasterio.open(file_path) as src:
+            self.image_data = src.read()  # Shape: (bands, height, width)
+            self.profile = src.profile
+            self.transform = src.transform
+            self.bounds = src.bounds
+            self.crs = src.crs
+            self.height, self.width = src.height, src.width
+            
+        print(f"Loaded image: {self.file_path}")
+        print(f"  Shape: {self.image_data.shape}")
+        print(f"  Data type: {self.image_data.dtype}")
+        # Print value range, breaking at 80 characters
+        print(
+            f"  Value range: "
+            f"[{self.image_data.min()}, {self.image_data.max()}]"
+        )
+        print(f"  CRS: {self.crs}")
+        print(f"  Bounds: {self.bounds}")
+        
+        # Apply normalization to the full image
+        self.normalized_image = normalize_image(
+            img=self.image_data.astype(np.float32),
+            strategy=self.normalization_strategy,
+            procedure=self.normalization_stat_procedure,
+            global_stats=self.global_stats,
+            clip_val=self.img_clip_val,
+            nodata=self.nodata,
+        )
+        
+        print(
+            f"Normalized image range: "
+            f"[{self.normalized_image.min():.2f}, "
+            f"{self.normalized_image.max():.2f}]"
+        )
+    
+    def get_full_image(self):
+        """Get the full normalized image as a tensor.
+        
+        Returns:
+            torch.Tensor: Full image as tensor (C, H, W)
         """
-        path = os.path.abspath(fn)
-        self.filename_regex = os.path.basename(path)
-        super().__init__(paths=os.path.dirname(path), transforms=transforms)
-
+        return torch.from_numpy(self.normalized_image).float()
 
 class FTWMapAfrica(NonGeoDataset):
     """
