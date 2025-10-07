@@ -23,11 +23,17 @@ def combine_test_csvs(folder_path, output_name, add_source_column=True):
     csv_pattern = os.path.join(folder_path, '*.csv')
     csv_files = glob.glob(csv_pattern)
     
+    # Filter out existing combined_metrics files
+    csv_files = [f for f in csv_files 
+                 if not os.path.basename(f).startswith('combined_metrics')]
+    
     if not csv_files:
-        print(f'No CSV files found in {folder_path}')
+        print(f'No CSV files found in {folder_path}'\
+              '(excluding combined_metrics files)')
         return False
     
-    print(f'Found {len(csv_files)} CSV files:')
+    print(f'Found {len(csv_files)} CSV files ' \
+          '(excluding combined_metrics files):')
     for f in csv_files:
         print(f'  - {os.path.basename(f)}')
     

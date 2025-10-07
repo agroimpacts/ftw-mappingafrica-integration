@@ -33,14 +33,14 @@ echo -e "${YELLOW}Output file will be: $COMBINED_CSV_NAME${NC}"
 # Create local folder if it doesn't exist
 mkdir -p "$LOCAL_FOLDER"
 
-# Build rsync command
-RSYNC_CMD="rsync -avz --progress"
+# Build rsync command - exclude existing combined_metrics files
+RSYNC_CMD="rsync -avz --progress --exclude='combined_metrics*.csv'"
 if [[ -n "$SSH_KEY_PATH" ]]; then
     RSYNC_CMD="$RSYNC_CMD -e 'ssh -i $SSH_KEY_PATH'"
 fi
 RSYNC_CMD="$RSYNC_CMD $REMOTE_HOST:$REMOTE_FOLDER/ $LOCAL_FOLDER/"
 
-echo -e "${YELLOW}Syncing folder from remote server...${NC}"
+echo -e "${YELLOW}Syncing folder from remote server (excluding combined_metrics files)...${NC}"
 echo "Command: $RSYNC_CMD"
 
 # Execute rsync
@@ -58,7 +58,7 @@ if [[ $? -eq 0 ]]; then
         echo -e "${RED}✗ Python script not found: $PYTHON_SCRIPT${NC}"
         echo -e "${YELLOW}Looking for combine-model-tests.py in \
             current directory...${NC}"
-        if [[ -f "./combine-test-results.py" ]]; then
+        if [[ -f "./combine-model-tests.py" ]]; then
             PYTHON_SCRIPT="./combine-model-tests.py"
             echo -e "${GREEN}✓ Found in current directory${NC}"
         else
