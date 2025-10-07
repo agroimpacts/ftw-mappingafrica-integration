@@ -218,6 +218,93 @@ from .utils import *
         
 #         return sample
 
+# class SimpleRasterDataset:
+#     """A simple dataset that reads raster files directly with rasterio."""
+    
+#     def __init__(
+#         self,
+#         file_path: str,
+#         normalization_strategy: str = "min_max",
+#         normalization_stat_procedure: str = "lab",
+#         global_stats: Optional[Union[Dict[str, Any], Tuple, List]] = None,
+#         img_clip_val: float = 0,
+#         nodata: Optional[List] = None,
+#     ):
+#         """Initialize the SimpleRasterDataset."""
+#         self.file_path = file_path
+#         self.normalization_strategy = normalization_strategy
+#         self.normalization_stat_procedure = normalization_stat_procedure
+#         self.global_stats = global_stats
+#         self.img_clip_val = img_clip_val
+#         self.nodata = nodata or [65535]
+        
+#         # Read the image and store it
+#         with rasterio.open(file_path) as src:
+#             self.image_data = src.read()  # Shape: (bands, height, width)
+#             self.profile = src.profile
+#             self.transform = src.transform
+#             self.bounds = src.bounds
+#             self.crs = src.crs
+#             self.height, self.width = src.height, src.width
+            
+#         print(f"Loaded image: {self.file_path}")
+#         print(f"  Shape: {self.image_data.shape}")
+#         print(f"  Data type: {self.image_data.dtype}")
+#         print(f"  Value range: [{self.image_data.min()}, {self.image_data.max()}]")
+#         print(f"  CRS: {self.crs}")
+#         print(f"  Bounds: {self.bounds}")
+        
+#         # Apply normalization to the full image
+#         self.normalized_image = normalize_image(
+#             img=self.image_data.astype(np.float32),
+#             strategy=self.normalization_strategy,
+#             procedure=self.normalization_stat_procedure,
+#             global_stats=self.global_stats,
+#             clip_val=self.img_clip_val,
+#             nodata=self.nodata,
+#         )
+        
+#         print(f"Normalized image range: [{self.normalized_image.min():.2f}, {self.normalized_image.max():.2f}]")
+    
+    # def get_patch(self, bbox):
+    #     """Extract a patch from the image given a bounding box.
+        
+    #     Args:
+    #         bbox: (minx, miny, maxx, maxy) in the image's CRS
+            
+    #     Returns:
+    #         torch.Tensor: Image patch as tensor (C, H, W)
+    #     """
+    #     # Convert geographic bounds to pixel coordinates
+    #     from rasterio.windows import from_bounds
+    #     window = from_bounds(*bbox, self.transform)
+        
+    #     # Convert window to integer pixel coordinates
+    #     col_off = int(window.col_off)
+    #     row_off = int(window.row_off)
+    #     width = int(window.width)
+    #     height = int(window.height)
+        
+    #     # Clamp to image bounds
+    #     col_off = max(0, min(col_off, self.width))
+    #     row_off = max(0, min(row_off, self.height))
+    #     width = min(width, self.width - col_off)
+    #     height = min(height, self.height - row_off)
+        
+    #     # Extract patch
+    #     patch = self.normalized_image[:, row_off:row_off+height, 
+    #                                   col_off:col_off+width]
+        
+    #     # Convert to tensor
+    #     return torch.from_numpy(patch).float()
+    
+    # def get_full_image(self):
+    #     """Get the full normalized image as a tensor.
+        
+    #     Returns:
+    #         torch.Tensor: Full image as tensor (C, H, W)
+    #     """
+    #     return torch.from_numpy(self.normalized_image).float()
 class SimpleRasterDataset:
     """A simple dataset that reads raster files directly with rasterio."""
     
@@ -250,7 +337,11 @@ class SimpleRasterDataset:
         print(f"Loaded image: {self.file_path}")
         print(f"  Shape: {self.image_data.shape}")
         print(f"  Data type: {self.image_data.dtype}")
-        print(f"  Value range: [{self.image_data.min()}, {self.image_data.max()}]")
+        # Print value range, breaking at 80 characters
+        print(
+            f"  Value range: "
+            f"[{self.image_data.min()}, {self.image_data.max()}]"
+        )
         print(f"  CRS: {self.crs}")
         print(f"  Bounds: {self.bounds}")
         
@@ -264,39 +355,11 @@ class SimpleRasterDataset:
             nodata=self.nodata,
         )
         
-        print(f"Normalized image range: [{self.normalized_image.min():.2f}, {self.normalized_image.max():.2f}]")
-    
-    def get_patch(self, bbox):
-        """Extract a patch from the image given a bounding box.
-        
-        Args:
-            bbox: (minx, miny, maxx, maxy) in the image's CRS
-            
-        Returns:
-            torch.Tensor: Image patch as tensor (C, H, W)
-        """
-        # Convert geographic bounds to pixel coordinates
-        from rasterio.windows import from_bounds
-        window = from_bounds(*bbox, self.transform)
-        
-        # Convert window to integer pixel coordinates
-        col_off = int(window.col_off)
-        row_off = int(window.row_off)
-        width = int(window.width)
-        height = int(window.height)
-        
-        # Clamp to image bounds
-        col_off = max(0, min(col_off, self.width))
-        row_off = max(0, min(row_off, self.height))
-        width = min(width, self.width - col_off)
-        height = min(height, self.height - row_off)
-        
-        # Extract patch
-        patch = self.normalized_image[:, row_off:row_off+height, 
-                                      col_off:col_off+width]
-        
-        # Convert to tensor
-        return torch.from_numpy(patch).float()
+        print(
+            f"Normalized image range: "
+            f"[{self.normalized_image.min():.2f}, "
+            f"{self.normalized_image.max():.2f}]"
+        )
     
     def get_full_image(self):
         """Get the full normalized image as a tensor.
