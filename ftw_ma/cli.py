@@ -250,12 +250,33 @@ def model_test(
     "--date_format", type=str, default="%Y%m%d", show_default=True,
     help="Date format for output filename (strftime format)"
 )
+@click.option(
+    "--create_plots", is_flag=True,
+    help="Create visualization plots after inference"
+)
+@click.option(
+    "--plot_output_dir", type=str,
+    help="Custom output directory for plots (default: output_dir/plots)"
+)
+@click.option(
+    "--plot_rgb_bands", type=str, default="0,1,2", show_default=True,
+    help="RGB band indices for plots (comma-separated, 0-indexed)"
+)
+@click.option(
+    "--plot_max_samples", type=int, default=20, show_default=True,
+    help="Maximum number of samples to include in plots"
+)
+@click.option(
+    "--plot_images_per_batch", type=int, default=5, show_default=True,
+    help="Number of images per plot batch"
+)
 def model_predict(
     catalog, model, output, data_dir, path_column, id_column, split,
     normalization_strategy, normalization_stat_procedure, img_clip_val,
     global_stats, nodata, band_order, gpu,
     save_scores, overwrite, crop_to_geometry, geometry_column, mps_mode,
-    num_workers, batch_process, date_column, date_format
+    num_workers, batch_process, date_column, date_format, create_plots,
+    plot_output_dir, plot_rgb_bands, plot_max_samples, plot_images_per_batch
 ):
     """Run batch inference from CSV/GeoPackage catalog."""
     from .inference import load_model, inference_run_single
@@ -433,15 +454,86 @@ def model_predict(
     print(f"  Failed: {total_files - successful}")
     if crop_to_geometry:
         print(f"  Cropped to geometry: {cropped_count}")
-    print(f"  Results saved to: {results_file}")
 
-def _process_files_sequential(df, data_dir_path, output_dir, model_net, device,
-                             parsed_global_stats, parsed_nodata, parsed_band_order,
-                             path_column, id_column, save_scores, 
-                             normalization_strategy, normalization_stat_procedure,
-                             img_clip_val, overwrite, crop_to_geometry, 
-                             geometry_column, is_geodataframe, date_column, 
-                             date_format):
+    # Create plots if requested
+    if create_plots:
+        print(f"\nCreating visualization plots...")
+        
+        try:
+            # Parse RGB bands
+            rgb_bands = tuple(int(x.strip()) for x in plot_rgb_bands.split(","))
+            if len(rgb_bands) != 3:
+                raise ValueError("RGB bands must be exactly 3 values")
+            
+            # Determine plot output directory
+            if plot_output_dir:
+                plots_dir = Path(plot_output_dir)
+            else:
+                plots_dir = output_dir / "plots"
+            
+            # Extract experiment name from model checkpoint path
+            experiment_name = _extract_experiment_name_from_model(Path(model))
+            print(f"Extracted experiment name from model path: {experiment_name}")
+            
+            from .plotting import create_inference_plots
+            
+            create_inference_plots(
+                catalog_path=catalog_path,
+                data_dir=data_dir_path,
+                inference_dir=output_dir,
+                output_dir=plots_dir,
+                rgb_bands=rgb_bands,
+                images_per_plot=plot_images_per_batch,
+                max_samples=plot_max_samples,
+                experiment_name=experiment_name  # Add this parameter
+            )
+            
+            print(f"✓ Plots saved to: {plots_dir}")
+            
+        except Exception as e:
+            print(f"⚠ Failed to create plots: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+
+def _extract_experiment_name_from_model(model_path: Path) -> str:
+    """Extract experiment name from model checkpoint path."""
+    path_parts = model_path.parts
+    
+    # Look for lightning_logs in the path
+    if "lightning_logs" in path_parts:
+        lightning_idx = path_parts.index("lightning_logs")
+        if lightning_idx > 0:
+            # Return the directory name before lightning_logs
+            return path_parts[lightning_idx - 1]
+    
+    # Alternative patterns to look for
+    # Look for common experiment directory patterns
+    for i, part in enumerate(path_parts):
+        # If we find version_X, the parent might be the experiment
+        if part.startswith("version_") and i > 0:
+            return path_parts[i - 1]
+        # If we find checkpoints directory, go up two levels
+        if part == "checkpoints" and i >= 2:
+            return path_parts[i - 2]
+    
+    # If no recognizable pattern, use the grandparent directory of model file
+    if len(path_parts) >= 3:
+        return path_parts[-3]  # Grandparent directory
+    elif len(path_parts) >= 2:
+        return path_parts[-2]  # Parent directory
+    
+    # Fallback to model filename without extension
+    return model_path.stem
+
+def _process_files_sequential(
+        df, data_dir_path, output_dir, model_net, device,
+        parsed_global_stats, parsed_nodata, parsed_band_order,
+        path_column, id_column, save_scores, 
+        normalization_strategy, normalization_stat_procedure,
+        img_clip_val, overwrite, crop_to_geometry, 
+        geometry_column, is_geodataframe, date_column, 
+        date_format
+    ):
     """Process files sequentially (original implementation)."""
     from .inference import inference_run_single
     import geopandas as gpd
@@ -564,13 +656,15 @@ def _process_files_sequential(df, data_dir_path, output_dir, model_net, device,
 
     return results
 
-def _process_files_parallel(df, data_dir_path, output_dir, model_path, device, 
-                            parsed_global_stats, parsed_nodata, parsed_band_order,
-                            num_workers, path_column, id_column, save_scores,
-                            normalization_strategy, normalization_stat_procedure,
-                            img_clip_val, overwrite, crop_to_geometry, 
-                            geometry_column, is_geodataframe, date_column, 
-                            date_format):
+def _process_files_parallel(
+    df, data_dir_path, output_dir, model_path, device, 
+    parsed_global_stats, parsed_nodata, parsed_band_order,
+    num_workers, path_column, id_column, save_scores,
+    normalization_strategy, normalization_stat_procedure,
+    img_clip_val, overwrite, crop_to_geometry, 
+    geometry_column, is_geodataframe, date_column, 
+    date_format
+):
     """Process files in parallel (CPU only)."""
     from concurrent.futures import ProcessPoolExecutor
     import functools
@@ -618,12 +712,14 @@ def _process_files_parallel(df, data_dir_path, output_dir, model_path, device,
     
     return results
 
-def _process_chunk(chunk_df, data_dir_path, output_dir, model_path, device_type,
-                   parsed_global_stats, parsed_nodata, parsed_band_order,
-                   path_column, id_column, save_scores, normalization_strategy,
-                   normalization_stat_procedure, img_clip_val, overwrite,
-                   crop_to_geometry, geometry_column, is_geodataframe,
-                   date_column, date_format, df_crs):
+def _process_chunk(
+    chunk_df, data_dir_path, output_dir, model_path, device_type,
+    parsed_global_stats, parsed_nodata, parsed_band_order,
+    path_column, id_column, save_scores, normalization_strategy,
+    normalization_stat_procedure, img_clip_val, overwrite,
+    crop_to_geometry, geometry_column, is_geodataframe,
+    date_column, date_format, df_crs
+):
     """Process a chunk of the dataframe."""
     from .inference import load_model, inference_run_single
     
