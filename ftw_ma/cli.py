@@ -279,7 +279,7 @@ def model_predict(
     plot_output_dir, plot_rgb_bands, plot_max_samples, plot_images_per_batch
 ):
     """Run batch inference from CSV/GeoPackage catalog."""
-    from .inference import load_model, inference_run_single
+    from .inference import load_model
 
     # Parse JSON strings for complex parameters
     parsed_global_stats = None
@@ -348,6 +348,8 @@ def model_predict(
 
     # Load catalog - handle both CSV and spatial formats
     catalog_path = Path(catalog)
+    data_dir_path = Path(data_dir)  # Add this line
+
     print(f"Loading catalog: {catalog}")
 
     try:
@@ -396,13 +398,15 @@ def model_predict(
         print(f"Warning: Date column '{date_column}' not found, ignoring date formatting")
         date_column = None
 
-    # Create output directory
-    output_dir = Path(output)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Output directory: {output_dir}")
+    # Extract experiment name from model checkpoint path
+    model_name = _extract_experiment_name_from_model(Path(model))
     
-    # Convert data_dir to Path object
-    data_dir_path = Path(data_dir)
+    # Create model-specific output directory
+    output_dir = Path(output) / model_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"Model name: {model_name}")
+    print(f"Inference outputs will be saved to: {output_dir}")
 
     # Validate parallelization settings
     if batch_process and device.type in ['cuda', 'mps']:
@@ -471,9 +475,7 @@ def model_predict(
             else:
                 plots_dir = output_dir / "plots"
             
-            # Extract experiment name from model checkpoint path
-            experiment_name = _extract_experiment_name_from_model(Path(model))
-            print(f"Extracted experiment name from model path: {experiment_name}")
+            print(f"Plot outputs will be saved to: {plots_dir}")
             
             from .plotting import create_inference_plots
             
@@ -485,7 +487,7 @@ def model_predict(
                 rgb_bands=rgb_bands,
                 images_per_plot=plot_images_per_batch,
                 max_samples=plot_max_samples,
-                experiment_name=experiment_name  # Add this parameter
+                experiment_name=model_name  # Use the same model name for file prefixes
             )
             
             print(f"✓ Plots saved to: {plots_dir}")
