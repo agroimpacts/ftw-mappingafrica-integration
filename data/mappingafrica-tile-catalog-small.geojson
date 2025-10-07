@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "mappingafrica-tile-catalog-small",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "name": "513706", "date": "2023-11-15", "window_b": "2023/tile513706_2023-11_buf179_cog.tif" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -1.291, 10.29 ], [ -1.241, 10.29 ], [ -1.241, 10.24 ], [ -1.291, 10.24 ], [ -1.291, 10.29 ] ] ] } },
+{ "type": "Feature", "properties": { "name": "513726", "date": "2023-11-15", "window_b": "2023/tile513726_2023-11_buf179_cog.tif" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ -1.291, 10.24 ], [ -1.241, 10.24 ], [ -1.241, 10.19 ], [ -1.291, 10.19 ], [ -1.291, 10.24 ] ] ] } },
+{ "type": "Feature", "properties": { "name": "765503", "date": "2022-03-15", "window_b": "2022/tile765503_2022-03_buf179_cog.tif" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 15.559, -3.21 ], [ 15.559, -3.26 ], [ 15.609, -3.26 ], [ 15.609, -3.21 ], [ 15.559, -3.21 ] ] ] } },
+{ "type": "Feature", "properties": { "name": "910217", "date": "2024-06-15", "window_b": "2024/tile910217_2024-06_buf179_cog.tif" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 26.259, -14.96 ], [ 26.259, -15.01 ], [ 26.309, -15.01 ], [ 26.309, -14.96 ], [ 26.259, -14.96 ] ] ] } },
+{ "type": "Feature", "properties": { "name": "910218", "date": "2024-06-15", "window_b": "2024/tile910218_2024-06_buf179_cog.tif" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 26.309, -14.96 ], [ 26.309, -15.01 ], [ 26.359, -15.01 ], [ 26.359, -14.96 ], [ 26.309, -14.96 ] ] ] } }
+]
+}
