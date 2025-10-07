@@ -16,8 +16,10 @@ warnings.filterwarnings(
 from .dataset import *
 from .datamodule import *
 from .utils import *
+from .normalize import *
 from .losses import *
 from .trainers import *
 from .cli import *
 from .compiler import *
+from .plotting import *
 # from .metrics import *
