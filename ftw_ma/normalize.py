@@ -45,13 +45,13 @@ def normalize_image(
             not recognized, or if global statistics are required but not
             provided.
     """
-    print(f"normalize_image called with:")
-    print(f"  strategy: {strategy}")
-    print(f"  procedure: {procedure}")
-    print(f"  global_stats: {global_stats}")
-    print(f"  input shape: {img.shape}")
-    print(f"  input range: [{img.min():.2f}, {img.max():.2f}]")
-    print(f"  nodata values: {nodata}")
+    # print(f"normalize_image called with:")
+    # print(f"  strategy: {strategy}")
+    # print(f"  procedure: {procedure}")
+    # print(f"  global_stats: {global_stats}")
+    # print(f"  input shape: {img.shape}")
+    # print(f"  input range: [{img.min():.2f}, {img.max():.2f}]")
+    # print(f"  nodata values: {nodata}")
 
     if strategy not in ["min_max", "z_value"]:
         raise ValueError(
@@ -202,7 +202,7 @@ def normalize_image(
     # Ensure nodata pixels are set to 0 in the final output
     normal_img = normal_img.astype(np.float32)
     
-    print(f"  Set {np.sum(~valid_mask)} nodata pixels to 0.0")
-    print(f"  output range: [{normal_img.min():.2f}, {normal_img.max():.2f}]")
-    print(f"Normalized image range: [{normal_img.min():.2f}, {normal_img.max():.2f}]")
+    # print(f"  Set {np.sum(~valid_mask)} nodata pixels to 0.0")
+    # print(f"  output range: [{normal_img.min():.2f}, {normal_img.max():.2f}]")
+    # print(f"Normalized image range: [{normal_img.min():.2f}, {normal_img.max():.2f}]")
     return normal_img

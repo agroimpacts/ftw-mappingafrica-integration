@@ -89,16 +89,16 @@ class SimpleRasterDataset:
             self.crs = src.crs
             self.height, self.width = src.height, src.width
             
-        print(f"Loaded image: {self.file_path}")
-        print(f"  Shape: {self.image_data.shape}")
-        print(f"  Data type: {self.image_data.dtype}")
-        # Print value range, breaking at 80 characters
-        print(
-            f"  Value range: "
-            f"[{self.image_data.min()}, {self.image_data.max()}]"
-        )
-        print(f"  CRS: {self.crs}")
-        print(f"  Bounds: {self.bounds}")
+        # print(f"Loaded image: {self.file_path}")
+        # print(f"  Shape: {self.image_data.shape}")
+        # print(f"  Data type: {self.image_data.dtype}")
+        # # Print value range, breaking at 80 characters
+        # print(
+        #     f"  Value range: "
+        #     f"[{self.image_data.min()}, {self.image_data.max()}]"
+        # )
+        # print(f"  CRS: {self.crs}")
+        # print(f"  Bounds: {self.bounds}")
         
         # Apply normalization to the full image
         self.normalized_image = normalize_image(
