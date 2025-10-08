@@ -2,7 +2,7 @@ trainer:
   max_epochs: 100
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ~/working/models/fullcat-ftwbaseline-exp3
+  default_root_dir: ~/working/models/ftwbaseline-localtversky-minmax_gab-exp8
   devices: [0]
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
@@ -35,11 +35,13 @@ data:
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
     catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-catalog2.csv
-    normalization_strategy: z_value
-    normalization_stat_procedure: gpb
+    normalization_strategy: min_max
+    normalization_stat_procedure: gab
     global_stats:
-      mean: [0, 0, 0, 0]
-      std: [3000, 3000, 3000, 3000]
+      mean: null
+      std: null
+      min: [68.438525]
+      max: [5772.288821]
     img_clip_val: 0
     aug_list: [rotation, hflip, vflip, sharpness]
 seed_everything: 7
