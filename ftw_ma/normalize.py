@@ -75,10 +75,10 @@ def normalize_image(
     
     # Create valid pixel mask for setting nodata pixels to 0 at the end
     valid_mask = ~np.isnan(img_tmp)
-    valid_pixels = np.sum(valid_mask)
-    total_pixels = img.size
-    valid_pct = (valid_pixels / total_pixels) * 100
-    print(f"  Valid pixels: {valid_pixels}/{total_pixels} ({valid_pct:.1f}%)")
+    # valid_pixels = np.sum(valid_mask)
+    # total_pixels = img.size
+    # valid_pct = (valid_pixels / total_pixels) * 100
+    # print(f"  Valid pixels: {valid_pixels}/{total_pixels} ({valid_pct:.1f}%)")
 
     if strategy == "min_max":
         if clip_val > 0:
