@@ -122,8 +122,9 @@ class FTWMapAfricaDataModule(LightningDataModule):
             "vflip": K.RandomVerticalFlip(p=0.5),
             "rescale": K.RandomResizedCrop(
                 size=(256, 256),
-                scale=(0.75, 1.5),
-                ratio=(1.0, 1.0),
+                # scale=(0.75, 1.5),
+                # ratio=(1.0, 1.0),
+                scale=(0.3, 0.9), ratio=(0.75, 1.33),
                 cropping_mode="slice",
                 p=0.5
             ),
