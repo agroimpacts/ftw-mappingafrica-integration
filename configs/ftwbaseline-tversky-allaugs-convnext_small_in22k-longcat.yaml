@@ -18,7 +18,7 @@ model:
     class_weights: null
     loss: localtversky
     model: unet
-    backbone: convnext_small.fb_in22k
+    backbone: tu-convnext_small.fb_in22k
     weights: true
     patch_weights: true
     in_channels: 4
