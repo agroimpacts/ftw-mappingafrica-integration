@@ -133,7 +133,7 @@ class FTWMapAfricaDataModule(LightningDataModule):
             "gaussian_noise": K.RandomGaussianNoise(
                 mean=0.0, std=0.05, p=0.25
             ),
-            "brightness": K.RandomBrightness(brightness=(0.98, 1.02), p=0.25),
+            "brightness": K.RandomBrightness(brightness=(0.8, 1.5), p=0.25),
             "contrast": K.RandomContrast(contrast=(0.9, 1.2), p=0.25),
         }
         if self.normalization_strategy == "min_max":
