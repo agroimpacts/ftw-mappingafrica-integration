@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./tester.sh MOD [VERSION] [CTLG]
-#   MOD      - required (model name, e.g., "mymodel")
-#   VERSION  - optional (integer or "latest", default: latest)
-#   CTLG     - optional (catalog .csv path, default: data/ftw-catalog2.csv)
+# Usage: ./tester.sh MOD [VERSION] [CTLG] [DATA_OVERRIDE]
+#   MOD           - required (model name, e.g., "mymodel")
+#   VERSION       - optional (integer or "latest", default: latest)
+#   CTLG          - optional (catalog .csv path, default: data/ftw-catalog2.csv)
+#   DATA_OVERRIDE - optional (path to override data.init_args.data_dir in config)
 
 if [ $# -lt 1 ]; then
     echo "❌ Missing required argument: MOD"
-    echo "Usage: $0 MOD [VERSION] [CTLG]"
+    echo "Usage: $0 MOD [VERSION] [CTLG] [DATA_OVERRIDE]"
     exit 1
 fi
 
 MOD=$1
 VERSION="latest"
 CTLG="data/ftw-catalog2.csv"
+DATA_OVERRIDE=""
 
 # --- Parse arguments ---
 if [ $# -ge 2 ]; then
@@ -23,8 +25,14 @@ if [ $# -ge 2 ]; then
         if [ $# -ge 3 ]; then
             CTLG=$3
         fi
+        if [ $# -ge 4 ]; then
+            DATA_OVERRIDE=$4
+        fi
     else
         CTLG=$2
+        if [ $# -ge 3 ]; then
+            DATA_OVERRIDE=$3
+        fi
     fi
 fi
 
@@ -72,24 +80,55 @@ if [ ! -f "$CTLG" ]; then
     exit 1
 fi
 
-# Build OUT name as MOD-CTLGbase.csv
+# --- Optional nested YAML override ---
+TMP_CFG="$CFG"
+if [ -n "$DATA_OVERRIDE" ]; then
+    TMP_CFG=$(mktemp /tmp/${MOD}_cfg_XXXX.yaml)
+    echo "📝 Creating temporary config with overridden data path: $TMP_CFG"
+
+    python - <<PY
+import yaml, sys
+path = "$CFG"
+out = "$TMP_CFG"
+data_path = "$DATA_OVERRIDE"
+
+with open(path) as f:
+    cfg = yaml.safe_load(f) or {}
+
+cfg.setdefault("data", {}).setdefault("init_args", {})["data_dir"] = data_path
+
+with open(out, "w") as f:
+    yaml.safe_dump(cfg, f, default_flow_style=False)
+PY
+
+    echo "🔍 Preview of modified config (first 10 lines):"
+    head -n 10 "$TMP_CFG"
+    echo "========================================"
+fi
+
+# --- Output path ---
 CTLG_BASE=$(basename "$CTLG" .csv)
 OUT="~/working/models/results/${MOD}-${CTLG_BASE}.csv"
 OUT=$(eval echo "$OUT")
 
-# Ensure output directory exists
 mkdir -p "$(dirname "$OUT")"
 
 # --- Run ---
 echo "✅ Running ftw_ma with:"
-echo "   Config:    $CFG"
+echo "   Config:    $TMP_CFG"
 echo "   Checkpoint:$CHKPT"
 echo "   Catalog:   $CTLG"
 echo "   Output:    $OUT"
 
 ftw_ma model test \
-    -cfg "$CFG" \
+    -cfg "$TMP_CFG" \
     -m "$CHKPT" \
     -cat "$CTLG" \
     -spl validate \
     -o "$OUT"
+
+# --- Cleanup ---
+if [ "$TMP_CFG" != "$CFG" ]; then
+    rm -f "$TMP_CFG"
+fi
+
