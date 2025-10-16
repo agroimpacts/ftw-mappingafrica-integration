@@ -20,7 +20,7 @@ model:
     model: unet
     backbone: tu-convnext_small.fb_in22k
     weights: true
-    patch_weights: true
+    patch_weights: false
     in_channels: 4
     num_classes: 3
     ignore_index: 3
