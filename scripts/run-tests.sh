@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=ftw_catalog_test
+#SBATCH --account=benq-tgirails
+#SBATCH --job-name=ftw_test
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --ntasks=1
@@ -10,42 +11,52 @@
 
 set -euo pipefail
 
-# ---------------------- CONFIGURATION -----------------------------------------
-CATALOG="data/ftw-catalog2.csv"
-SPLIT="validate"
-MODELS_FILE="models_list.txt"
-EXTRA_ARGS_FILE="extra_args.txt"
+# ---------------------- ARGUMENTS --------------------------------------------
+if [[ $# -lt 3 ]]; then
+  echo "Usage: $0 <catalog> <split> <models_file> " \
+       "[countries_file] [data_dir]"
+  exit 1
+fi
 
-# Optional data directory override
-DATA_DIR=""
+CATALOG="$1"                          # relative path to project root
+SPLIT="$2"
+MODELS_FILE="$3"
+COUNTRIES_FILE="${4:-scripts/countries.txt}"
+DATA_DIR="${5:-}"                      # root folder for image chips
 
-# ---------------------- READ INPUT FILES --------------------------------------
+# ---------------------- VALIDATION -------------------------------------------
 if [[ ! -f "$MODELS_FILE" ]]; then
   echo "❌ Models file not found: $MODELS_FILE" >&2
   exit 1
 fi
-MODELS=$(awk 'NF{print $1}' "$MODELS_FILE" | tr '\n' ' ')
 
-EXTRA_ARGS=()
-if [[ -f "$EXTRA_ARGS_FILE" ]]; then
-  while IFS= read -r line; do
-    [[ -z "$line" || "$line" =~ ^# ]] && continue
-    EXTRA_ARGS+=("$line")
-  done < "$EXTRA_ARGS_FILE"
-else
-  echo "⚠️ No $EXTRA_ARGS_FILE found — running with defaults."
+if [[ ! -f "$CATALOG" ]]; then
+  echo "❌ Catalog file not found: $CATALOG" >&2
+  exit 1
 fi
 
-# ---------------------- RUN CATALOG TEST --------------------------------------
-echo "🚀 Running catalog test for models: $MODELS"
-echo "Catalog: $CATALOG"
-echo "Split:   $SPLIT"
-echo "Extra args: ${EXTRA_ARGS[*]}"
-[[ -n "$DATA_DIR" ]] && echo "Data dir override: $DATA_DIR"
+[[ -n "$DATA_DIR" ]] && echo "📂 Using data dir: $DATA_DIR"
 
-python run_tests.py \
-  --models $MODELS \
+# ---------------------- READ FILES -------------------------------------------
+# Read models into array
+readarray -t MODELS < "$MODELS_FILE"
+
+# Read countries into array
+readarray -t COUNTRIES < "$COUNTRIES_FILE"
+
+# ---------------------- RUN TEST ---------------------------------------------
+echo "🚀 Running catalog batch tester"
+echo "  Catalog:      $CATALOG"
+echo "  Split:        $SPLIT"
+echo "  Models:       ${MODELS[*]}"
+echo "  Countries:    ${COUNTRIES[*]}"
+[[ -n "$DATA_DIR" ]] && echo "  Data dir:     $DATA_DIR"
+echo "-----------------------------------------------------"
+
+python scripts/run_tests.py \
   --catalog "$CATALOG" \
   --split "$SPLIT" \
-  --data_dir "$DATA_DIR" \
-  "${EXTRA_ARGS[@]}"
+  --models "${MODELS[@]}" \
+  --countries "${COUNTRIES[@]}" \
+  ${DATA_DIR:+--data_dir "$DATA_DIR"}
+

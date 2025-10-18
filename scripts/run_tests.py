@@ -85,10 +85,6 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
         return
 
     catalog_path = expand_path(catalog)
-    if data_dir:
-        data_path = expand_path(data_dir)
-        if not catalog_path.is_absolute():
-            catalog_path = data_path / catalog_path
 
     if not catalog_path.exists():
         print(f"❌ Catalog file not found: {catalog_path}")
