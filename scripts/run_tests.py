@@ -63,7 +63,6 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     cfg_path = Path(model)
     if cfg_path.suffix != ".yaml":
         cfg_path = Path("configs") / f"{model}.yaml"
-
     if not cfg_path.exists():
         print(f"❌ Config file not found: {cfg_path}")
         return
@@ -76,8 +75,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
         return
 
     checkpoint_dir = (
-        model_dir / "lightning_logs" /
-        f"version_{version_num}" / "checkpoints"
+        model_dir / "lightning_logs" / f"version_{version_num}" / "checkpoints"
     )
     checkpoint_file = find_checkpoint(checkpoint_dir)
     if checkpoint_file is None:
@@ -85,7 +83,6 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
         return
 
     catalog_path = expand_path(catalog)
-
     if not catalog_path.exists():
         print(f"❌ Catalog file not found: {catalog_path}")
         return
@@ -100,6 +97,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     catalog_base = catalog_path.stem
     combined_path = output_dir / f"{model}-{catalog_base}-{split}-combined.csv"
 
+    # Determine countries to loop over
     if countries is None:
         country_list = sorted(df["country"].dropna().unique())
     elif len(countries) == 1 and countries[0].lower() == "all":
@@ -107,21 +105,16 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     else:
         country_list = countries
 
+    combined_df = pd.DataFrame()
+
     for country in country_list:
         subset_df = df if country == "all" else df[df["country"] == country]
         if subset_df.empty:
             print(f"⚠️ No records for {country}, skipping.")
             continue
 
-        tmpfile = Path(tempfile.mkstemp(suffix=".csv", prefix=f"tmp_{country}_")[1])
+        tmpfile = Path(tempfile.mkstemp(suffix=".csv")[1])
         subset_df.to_csv(tmpfile, index=False)
-
-        out_name = (
-            f"{model}-{catalog_base}-{country}-{split}.csv"
-            if country != "all"
-            else f"{model}-{catalog_base}-FULL-{split}.csv"
-        )
-        output_file = output_dir / out_name
 
         print(f"🌍 Testing {model} on {country} ({len(subset_df)} rows)")
 
@@ -130,28 +123,21 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
             "-cfg", str(config_file),
             "-m", str(checkpoint_file),
             "-cat", str(tmpfile),
-            "-spl", split,
-            "-o", str(output_file)
+            "-spl", split
         ]
         if data_dir:
             cmd.extend(["-d", str(data_dir)])
 
         try:
             subprocess.run(cmd, check=True)
-            print(f"✅ {country} done. Merging into combined CSV.")
-            new_data = pd.read_csv(output_file)
-            if combined_path.exists():
-                old = pd.read_csv(combined_path)
-                merged = pd.concat([old, new_data], ignore_index=True)
-            else:
-                merged = new_data
-            merged.to_csv(combined_path, index=False)
-
+            new_data = pd.read_csv(tmpfile)  # Read results (or real output)
+            combined_df = pd.concat([combined_df, new_data], ignore_index=True)
         except subprocess.CalledProcessError as e:
             print(f"❌ {country} failed (exit {e.returncode})")
         finally:
             tmpfile.unlink(missing_ok=True)
 
+    combined_df.to_csv(combined_path, index=False)
     print(f"🏁 All subsets done for {model}.")
     print(f"📁 Combined results: {combined_path}")
 
@@ -167,8 +153,7 @@ def main():
     )
     parser.add_argument("--catalog", required=True, help="Path to catalog CSV")
     parser.add_argument(
-        "--split", default="validate",
-        help="Dataset split (default: validate)"
+        "--split", default="validate", help="Dataset split (default: validate)"
     )
     parser.add_argument(
         "--countries", nargs="+",
@@ -182,6 +167,7 @@ def main():
     args = parser.parse_args()
     for model in args.models:
         run_test(model, args.catalog, args.split, args.countries, args.data_dir)
+
 
 if __name__ == "__main__":
     main()
