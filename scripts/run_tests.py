@@ -113,6 +113,11 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
             print(f"⚠️ No records for {country}, skipping.")
             continue
 
+        # Add column to track country in combined output
+        subset_df = subset_df.copy()
+        subset_df["__model"] = model
+        subset_df["__country"] = country if country != "all" else "ALL"
+
         tmpfile = Path(tempfile.mkstemp(suffix=".csv")[1])
         subset_df.to_csv(tmpfile, index=False)
 
@@ -130,7 +135,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
 
         try:
             subprocess.run(cmd, check=True)
-            new_data = pd.read_csv(tmpfile)  # Read results (or real output)
+            new_data = pd.read_csv(tmpfile)
             combined_df = pd.concat([combined_df, new_data], ignore_index=True)
         except subprocess.CalledProcessError as e:
             print(f"❌ {country} failed (exit {e.returncode})")
