@@ -18,6 +18,7 @@ import pandas as pd
 import tempfile
 import re
 import os
+import numpy as np
 
 
 def expand_path(path_str):
@@ -105,7 +106,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     else:
         country_list = countries
 
-    combined_df = pd.DataFrame()
+    summaries = []  # collect one-row summaries
 
     for country in country_list:
         subset_df = df if country == "all" else df[df["country"] == country]
@@ -113,13 +114,12 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
             print(f"⚠️ No records for {country}, skipping.")
             continue
 
-        # Add column to track country in combined output
-        subset_df = subset_df.copy()
-        subset_df["__model"] = model
-        subset_df["__country"] = country if country != "all" else "ALL"
+        # prepare tmp input catalog for this subset
+        tmp_in = Path(tempfile.mkstemp(suffix=".csv")[1])
+        subset_df.to_csv(tmp_in, index=False)
 
-        tmpfile = Path(tempfile.mkstemp(suffix=".csv")[1])
-        subset_df.to_csv(tmpfile, index=False)
+        # prepare tmp output file (separate from input)
+        tmp_out = Path(tempfile.mkstemp(suffix=".csv")[1])
 
         print(f"🌍 Testing {model} on {country} ({len(subset_df)} rows)")
 
@@ -127,22 +127,59 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
             "ftw_ma", "model", "test",
             "-cfg", str(config_file),
             "-m", str(checkpoint_file),
-            "-cat", str(tmpfile),
-            "-spl", split
+            "-cat", str(tmp_in),
+            "-spl", split,
+            "-o", str(tmp_out),
         ]
         if data_dir:
             cmd.extend(["-d", str(data_dir)])
 
         try:
             subprocess.run(cmd, check=True)
-            new_data = pd.read_csv(tmpfile)
-            combined_df = pd.concat([combined_df, new_data], ignore_index=True)
+
+            if not tmp_out.exists():
+                print(f"⚠️ Expected output not produced for {country}: {tmp_out}")
+                continue
+
+            out_df = pd.read_csv(tmp_out)
+            if out_df.empty:
+                print(f"⚠️ ftw_ma produced empty output for {country}")
+                continue
+
+            # Aggregate numeric columns to a single summary row (mean)
+            num_cols = out_df.select_dtypes(include=[np.number]).columns.tolist()
+            if not num_cols:
+                print(f"⚠️ No numeric metric columns to aggregate for {country}")
+                continue
+
+            mean_series = out_df[num_cols].mean()
+            summary = mean_series.to_dict()
+            # add identifiers
+            summary["__model"] = model
+            summary["__country"] = (country if country != "all" else "ALL")
+            summaries.append(summary)
+
         except subprocess.CalledProcessError as e:
             print(f"❌ {country} failed (exit {e.returncode})")
         finally:
-            tmpfile.unlink(missing_ok=True)
+            # cleanup temporary files (input + output)
+            try:
+                tmp_in.unlink(missing_ok=True)
+            except Exception:
+                pass
+            try:
+                tmp_out.unlink(missing_ok=True)
+            except Exception:
+                pass
 
-    combined_df.to_csv(combined_path, index=False)
+    # build combined summary df and write one CSV with one row per country
+    if summaries:
+        combined_summary_df = pd.DataFrame(summaries)
+        combined_summary_df.to_csv(combined_path, index=False)
+        print(f"✅ Combined summary written: {combined_path}")
+    else:
+        print("⚠️ No summaries produced; nothing written.")
+
     print(f"🏁 All subsets done for {model}.")
     print(f"📁 Combined results: {combined_path}")
 
