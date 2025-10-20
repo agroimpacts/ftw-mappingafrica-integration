@@ -3,12 +3,12 @@
 Batch test multiple models on catalog subsets by country.
 
 Usage:
-  python run_tests.py \
-    --models ftwbaseline-exp1 ftwbaseline-exp2 \
-    --catalog data/ftw-catalog2.csv \
-    --split validate \
-    --countries Kenya Uganda \
-    --data_dir /scratch/data
+    python run_tests.py \
+        --models ftwbaseline-exp1 ftwbaseline-exp2 \
+        --catalog data/ftw-catalog2.csv \
+        --split validate \
+        --countries Kenya Uganda \
+        --data_dir /scratch/data
 """
 
 import argparse
@@ -52,7 +52,9 @@ def find_checkpoint(checkpoint_dir):
         return last_ckpt
     epoch_ckpts = list(checkpoint_dir.glob("epoch=*.ckpt"))
     if epoch_ckpts:
-        epoch_ckpts.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        epoch_ckpts.sort(
+            key=lambda x: x.stat().st_mtime, reverse=True
+        )
         print(f"⚠️ last.ckpt not found, using: {epoch_ckpts[0].name}")
         return epoch_ckpts[0]
     return None
@@ -115,11 +117,24 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
             continue
 
         # prepare tmp input catalog for this subset
-        tmp_in = Path(tempfile.mkstemp(suffix=".csv")[1])
+        # Use NamedTemporaryFile(delete=False) and close it so other
+        # processes can open it reliably.
+        tmp_in_f = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        tmp_in = Path(tmp_in_f.name)
+        tmp_in_f.close()
         subset_df.to_csv(tmp_in, index=False)
 
-        # prepare tmp output file (separate from input)
-        tmp_out = Path(tempfile.mkstemp(suffix=".csv")[1])
+        # prepare tmp output path (do NOT create an empty file ahead
+        # of time; let ftw_ma write it)
+        tmp_out_f = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        tmp_out = Path(tmp_out_f.name)
+        tmp_out_f.close()
+        # remove the empty file so ftw_ma can create/write it (some
+        # tools refuse to overwrite an existing empty file)
+        try:
+            tmp_out.unlink(missing_ok=True)
+        except Exception:
+            pass
 
         print(f"🌍 Testing {model} on {country} ({len(subset_df)} rows)")
 
@@ -135,24 +150,66 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
             cmd.extend(["-d", str(data_dir)])
 
         try:
-            subprocess.run(cmd, check=True)
+            # capture stdout/stderr to help debug empty outputs
+            proc = subprocess.run(
+                cmd, check=True, capture_output=True, text=True
+            )
+            if proc.stdout:
+                print("ftw_ma stdout:", proc.stdout.strip())
+            if proc.stderr:
+                print("ftw_ma stderr:", proc.stderr.strip())
 
             if not tmp_out.exists():
-                print(f"⚠️ Expected output not produced for {country}: {tmp_out}")
+                print(
+                    f"⚠️ Expected output not produced for {country}: {tmp_out}"
+                )
+                # print captured output again for debugging
+                print(
+                    "ftw_ma may have exited successfully but didn't write the"
+                    " output file."
+                )
                 continue
 
             out_df = pd.read_csv(tmp_out)
             if out_df.empty:
                 print(f"⚠️ ftw_ma produced empty output for {country}")
+                # dump stdout/stderr for troubleshooting
+                print("ftw_ma stdout:", proc.stdout.strip())
+                print("ftw_ma stderr:", proc.stderr.strip())
                 continue
-
 
             out_df["__model"] = model
             out_df["__country"] = (country if country != "all" else "ALL")
+
+            # produce a simple per-country summary row so combined CSV is
+            # useful
+            summary = {
+                "__model": model,
+                "__country": (country if country != "all" else "ALL"),
+                "input_rows": int(len(subset_df)),
+                "output_rows": int(len(out_df)),
+            }
+            # optionally add simple metrics if common column names exist
+            if "prob" in out_df.columns:
+                summary["prob_mean"] = float(out_df["prob"].mean())
+            elif "score" in out_df.columns:
+                summary["score_mean"] = float(out_df["score"].mean())
+
             summaries.append(summary)
 
         except subprocess.CalledProcessError as e:
+            # print captured output to help debugging
+            stdout = (
+                e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+            )
+            stderr = (
+                e.stderr.decode() if isinstance(e.stderr, bytes) else (e.stderr or "")
+            )
             print(f"❌ {country} failed (exit {e.returncode})")
+            if stdout:
+                print("ftw_ma stdout:", stdout.strip())
+            if stderr:
+                print("ftw_ma stderr:", stderr.strip())
         finally:
             # cleanup temporary files (input + output)
             try:
@@ -187,7 +244,8 @@ def main():
     )
     parser.add_argument("--catalog", required=True, help="Path to catalog CSV")
     parser.add_argument(
-        "--split", default="validate", help="Dataset split (default: validate)"
+        "--split", default="validate",
+        help="Dataset split (default: validate)"
     )
     parser.add_argument(
         "--countries", nargs="+",
