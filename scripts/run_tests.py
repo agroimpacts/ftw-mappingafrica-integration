@@ -178,24 +178,10 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
                 print("ftw_ma stderr:", proc.stderr.strip())
                 continue
 
-            out_df["__model"] = model
-            out_df["__country"] = (country if country != "all" else "ALL")
+            out_df["model"] = model
+            out_df["country"] = (country if country != "all" else "ALL")
 
-            # produce a simple per-country summary row so combined CSV is
-            # useful
-            summary = {
-                "__model": model,
-                "__country": (country if country != "all" else "ALL"),
-                "input_rows": int(len(subset_df)),
-                "output_rows": int(len(out_df)),
-            }
-            # optionally add simple metrics if common column names exist
-            if "prob" in out_df.columns:
-                summary["prob_mean"] = float(out_df["prob"].mean())
-            elif "score" in out_df.columns:
-                summary["score_mean"] = float(out_df["score"].mean())
-
-            summaries.append(summary)
+            summaries.append(out_df)
 
         except subprocess.CalledProcessError as e:
             # print captured output to help debugging
@@ -223,7 +209,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
 
     # build combined summary df and write one CSV with one row per country
     if summaries:
-        combined_summary_df = pd.DataFrame(summaries)
+        combined_summary_df = pd.concat(summaries, ignore_index=True)
         combined_summary_df.to_csv(combined_path, index=False)
         print(f"✅ Combined summary written: {combined_path}")
     else:
