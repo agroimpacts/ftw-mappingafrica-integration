@@ -146,17 +146,9 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
                 print(f"⚠️ ftw_ma produced empty output for {country}")
                 continue
 
-            # Aggregate numeric columns to a single summary row (mean)
-            num_cols = out_df.select_dtypes(include=[np.number]).columns.tolist()
-            if not num_cols:
-                print(f"⚠️ No numeric metric columns to aggregate for {country}")
-                continue
 
-            mean_series = out_df[num_cols].mean()
-            summary = mean_series.to_dict()
-            # add identifiers
-            summary["__model"] = model
-            summary["__country"] = (country if country != "all" else "ALL")
+            out_df["__model"] = model
+            out_df["__country"] = (country if country != "all" else "ALL")
             summaries.append(summary)
 
         except subprocess.CalledProcessError as e:
