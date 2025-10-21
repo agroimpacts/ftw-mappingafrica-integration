@@ -27,30 +27,6 @@ from torchvision.models._api import WeightsEnum
 from .losses import *
 from ftw.metrics import get_object_level_metrics
 
-# class SafeLossWrapper(nn.Module):
-#     """Wrap any criterion and ensure target/output have compatible device/dtype.
-#     This avoids loss implementations calling target.type(output.type()) which
-#     fails on MPS (e.g. 'torch.mps.FloatTensor' strings). (not yet working)"""
-#     def __init__(self, criterion: nn.Module):
-#         super().__init__()
-#         self.criterion = criterion
-
-#     def forward(self, output: torch.Tensor, target: torch.Tensor, *args, 
-#                 **kwargs):
-#         # move output to its device/dtype (no-op) and ensure target matches
-#         if output is None or target is None:
-#             return self.criterion(output, target, *args, **kwargs)
-
-#         # CrossEntropy and similar expect integer class labels
-#         if isinstance(self.criterion, (nn.CrossEntropyLoss,)):
-#             target = target.to(device=output.device, dtype=torch.long)
-#             output = output.to(device=output.device)
-#         else:
-#             # target = target.to(device=output.device, dtype=output.dtype)
-#             target = target.to(device=output.device)
-#             output = output.to(device=output.device)
-
-#         return self.criterion(output, target, *args, **kwargs)
 
 class CustomSemanticSegmentationTask(BaseTask):
     """Semantic Segmentation.
@@ -161,6 +137,21 @@ class CustomSemanticSegmentationTask(BaseTask):
             )
         elif loss == "localtversky":
             self.criterion = LocallyWeightedTverskyFocalLoss(
+                ignore_index=ignore_index
+            )
+        elif loss == "tversky":  # smp Tversky
+            self.criterion = smp.losses.TverskyLoss(
+                "multiclass", ignore_index=ignore_index
+            )
+        elif loss == "dice":
+            self.criterion = smp.losses.DiceLoss(
+                "multiclass", ignore_index=ignore_index
+            )
+        elif loss == "logcoshdice":
+            self.criterion = logCoshDice(
+                mode="multiclass", 
+                classes=self.hparams["num_classes"],
+                class_weights=class_weights,
                 ignore_index=ignore_index
             )
         else:
