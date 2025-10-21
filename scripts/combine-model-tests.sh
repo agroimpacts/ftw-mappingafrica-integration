@@ -51,18 +51,18 @@ if [[ $? -eq 0 ]]; then
     
     # Get the directory where this script is located
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PYTHON_SCRIPT="$SCRIPT_DIR/combine-model-tests.py"
+    PYTHON_SCRIPT="$SCRIPT_DIR/combine_model_tests.py"
     
     # Check if Python script exists
     if [[ ! -f "$PYTHON_SCRIPT" ]]; then
         echo -e "${RED}✗ Python script not found: $PYTHON_SCRIPT${NC}"
         echo -e "${YELLOW}Looking for combine-model-tests.py in \
             current directory...${NC}"
-        if [[ -f "./combine-model-tests.py" ]]; then
-            PYTHON_SCRIPT="./combine-model-tests.py"
+        if [[ -f "./combine_model_tests.py" ]]; then
+            PYTHON_SCRIPT="./combine_model_tests.py"
             echo -e "${GREEN}✓ Found in current directory${NC}"
         else
-            echo -e "${RED}✗ combine-model-tests.py not found${NC}"
+            echo -e "${RED}✗ combine_model_tests.py not found${NC}"
             exit 1
         fi
     fi
