@@ -157,7 +157,8 @@ class CustomSemanticSegmentationTask(BaseTask):
         else:
             raise ValueError(
                 f"Loss type '{loss}' is not valid. "
-                "Currently, supports 'ce', 'jaccard', 'focal', 'localtversky'."
+                "Currently, supports 'ce', 'jaccard', 'focal', 'localtversky',"
+                " 'tversky', 'dice', and 'logcoshdice'."
             )
         # self.criterion = SafeLossWrapper(self.criterion)
 
