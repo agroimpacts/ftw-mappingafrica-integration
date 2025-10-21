@@ -1,8 +1,8 @@
 trainer:
-  max_epochs: 100
+  max_epochs: 300
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ~/working/models/unet_convnext_small_in22k-localtversky-brgt-rescl-longcat
+  default_root_dir: ~/working/models/unet_cvnxt_sm_in22k-loctversky-brgt-rescl-e300-longcat
   devices: [0]
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
