@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from IPython.core.debugger import set_trace
+from segmentation_models_pytorch.losses import DiceLoss as Dice
 
 def _as_long_index(t: torch.Tensor) -> torch.Tensor:
     """Return a LongTensor suitable for one_hot/indexing."""
@@ -433,3 +434,21 @@ class LocallyWeightedTverskyFocalCELoss(nn.Module):
         loss = TverskyFocalCELoss(loss_weight=lossWeight, **self.kwargs)
 
         return loss(predict, target)
+    
+# from bakeoff
+class logCoshDice(Dice):
+    def __init__(self, class_weights=None, **kwargs):
+        super().__init__(**kwargs)
+        self.class_weights = (
+            torch.tensor(class_weights, dtype=torch.float32) \
+                if class_weights is not None else None
+        )
+        
+    def aggregate_loss(self, loss: torch.Tensor) -> torch.Tensor:
+        if self.class_weights is not None:
+            weights = self.class_weights.to(loss.device)
+            loss = (loss * weights) / weights.sum()
+
+        loss = loss.mean()
+        loss = torch.log(torch.cosh(loss))
+        return loss
