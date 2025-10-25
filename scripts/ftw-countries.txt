@@ -1,3 +1,4 @@
+all
 austria
 belgium
 cambodia
