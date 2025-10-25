@@ -1,5 +1,5 @@
 trainer:
-  max_epochs: 300
+  max_epochs: 400
   log_every_n_steps: 10
   accelerator: cuda
   default_root_dir: ~/working/models/unet_cvnxt_sm_in22k-loctversky-brgt-rescl-e300-longcat
