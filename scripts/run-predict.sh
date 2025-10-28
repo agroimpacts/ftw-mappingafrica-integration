@@ -8,312 +8,147 @@
 #SBATCH --output=logs/predict/%x_%j.out
 #SBATCH --error=logs/predict/%x_%j.err
 
-# Unified runner: can be executed directly or submitted with sbatch.
+#!/usr/bin/env bash
+# Prediction runner.
 # Usage examples:
-#   Direct:
-#     ./scripts/run-predictions.sh -d /data -c catalog.geojson \
-#       -m /path/to/model.ckpt
-#   Slurm:
-#     sbatch scripts/run-predictions.sh -d /data -c catalog.geojson \
-#       -m /path/to/model.ckpt
-#
-# Config file support: -f config.yml (or config.json).
-# CLI args override config values.
+#  Direct: ./scripts/run-predict.sh -d /data -c catalog.geojson -m /path/to/model.ckpt
+#  With config: ./scripts/run-predict.sh -f config.yml
+#  Submit with sbatch (provide SBATCH flags on the sbatch command line):
+#    sbatch --account=benq-tgirails --partition=gpu --time=04:00:00 scripts/run-predict.sh -f cfg.yml
 
 set -euo pipefail
 
-# ==================== Defaults ====================
-MODEL=""
+# Defaults
+DATA_DIR=""
+CATALOG=""
 MODEL_CKPT=""
-NORM=${NORM:-"z_value"}
-NORM_PROC=${NORM_PROC:-"gpb"}
-OUTPUT_BASE=${OUTPUT_BASE:-"~/working/models/outputs/predictions"}
-PLOT_DIR=${PLOT_DIR:-"~/working/models/outputs/plots"}
-GLOBAL_STATS=${GLOBAL_STATS:-"{\"mean\":[0,0,0,0], \
-\"std\":[3000,3000,3000,3000]}"}
-CREATE_PLOTS=${CREATE_PLOTS:-"yes"}
-BAND_ORDER=${BAND_ORDER:-""}
-CROP_TO_GEOMETRY=${CROP_TO_GEOMETRY:-"no"}
-MPS_MODE=${MPS_MODE:-"no"}
-LOG_FILE=${LOG_FILE:-"~/working/models/logs/predict_runs.log"}
+MODEL_NAME=""
+OUTPUT_BASE="${OUTPUT_BASE:-$HOME/working/models/outputs/predictions}"
+PLOT_DIR="${PLOT_DIR:-$HOME/working/models/outputs/plots}"
+GLOBAL_STATS=""
+NORMALIZATION="${NORMALIZATION:-z_value}"
+NORMALIZATION_PROC="${NORMALIZATION_PROC:-gpb}"
+CREATE_PLOTS="yes"
 DRY_RUN="no"
 CONFIG_FILE=""
 
-# Expand ~ helper
-expand_path() {
-    eval echo "$1"
+usage() {
+  cat <<EOF
+Usage: $0 [options]
+  -f <config.yml|config.json>  optional config file (keys: data_dir, catalog, model_ckpt, output_base, plot_dir, global_stats, normalization, normalization_proc, create_plots, model_name)
+  -d <data_dir>                data directory (overrides config)
+  -c <catalog>                 catalog file (overrides config)
+  -m <model_ckpt>              model checkpoint path (overrides config)
+  -o <output_base>             base output dir (overrides config)
+  --plot-dir <dir>             plot output dir (overrides config)
+  --no-plots                   disable plot creation
+  --dry-run                    print command and exit
+  -h                           show this help
+EOF
+  exit 1
 }
 
-# ==================== Parse Args ====================
+# simple arg parse
 while [[ $# -gt 0 ]]; do
-    key="$1"
-    case "$key" in
-        -f|--config) CONFIG_FILE="$2"; shift 2 ;;
-        -d|--data) DATA_DIR="$2"; shift 2 ;;
-        -c|--catalog) CATALOG="$2"; shift 2 ;;
-        -m|--model) MODEL_CKPT="$2"; shift 2 ;;
-        -M|--model-name) MODEL="$2"; shift 2 ;;
-        -p|--plot-dir) PLOT_DIR="$2"; shift 2 ;;
-        -n|--norm) NORM="$2"; shift 2 ;;
-        -np|--norm-proc) NORM_PROC="$2"; shift 2 ;;
-        -g|--global-stats) GLOBAL_STATS="$2"; shift 2 ;;
-        -bo|--band-order) BAND_ORDER="$2"; shift 2 ;;
-        -crop|--crop) CROP_TO_GEOMETRY="$2"; shift 2 ;;
-        -mps|--mps) MPS_MODE="$2"; shift 2 ;;
-        -plot|--plot) CREATE_PLOTS="$2"; shift 2 ;;
-        -dr|--dry-run) DRY_RUN="yes"; shift 1 ;;
-        -h|--help)
-            sed -n '1,240p' "$0"
-            exit 0
-            ;;
-        *)
-            echo "Unknown argument: $1" >&2
-            exit 1
-            ;;
-    esac
+  case "$1" in
+    -f) CONFIG_FILE="$2"; shift 2 ;;
+    -d) DATA_DIR="$2"; shift 2 ;;
+    -c) CATALOG="$2"; shift 2 ;;
+    -m) MODEL_CKPT="$2"; shift 2 ;;
+    -o) OUTPUT_BASE="$2"; shift 2 ;;
+    --plot-dir) PLOT_DIR="$2"; shift 2 ;;
+    --no-plots) CREATE_PLOTS="no"; shift 1 ;;
+    --dry-run) DRY_RUN="yes"; shift 1 ;;
+    -h) usage ;;
+    *) echo "Unknown arg: $1"; usage ;;
+  esac
 done
 
-# ==================== Load config file (if provided) ====================
+# load config if provided (only extract known keys)
 if [[ -n "${CONFIG_FILE:-}" ]]; then
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        echo "Config file not found: $CONFIG_FILE" >&2
-        exit 1
-    fi
-
-    # Parse config with python: produce __CFG_<UPPER>=value shell vars
-    mapfile -t __CFG_LINES < <(python3 - "$CONFIG_FILE" <<'PY'
-import sys, json, os
-p = sys.argv[1]
-cfg = {}
+  if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "Config file not found: $CONFIG_FILE" >&2
+    exit 1
+  fi
+  # python reads config and prints bash assignments for keys we accept
+  eval "$(python3 - "$CONFIG_FILE" <<'PY'
+import sys, json
+p=sys.argv[1]
+cfg={}
 try:
     import yaml
     cfg = yaml.safe_load(open(p))
 except Exception:
-    try:
-        cfg = json.load(open(p))
-    except Exception as e:
-        print(f"ERROR_PARSING_CONFIG:{e}")
-        sys.exit(2)
+    cfg = json.load(open(p))
 if not isinstance(cfg, dict):
-    cfg = {}
+    cfg={}
+keys = {
+ 'data_dir':'DATA_DIR',
+ 'catalog':'CATALOG',
+ 'model_ckpt':'MODEL_CKPT',
+ 'output_base':'OUTPUT_BASE',
+ 'plot_dir':'PLOT_DIR',
+ 'global_stats':'GLOBAL_STATS',
+ 'normalization':'NORMALIZATION',
+ 'normalization_proc':'NORMALIZATION_PROC',
+ 'create_plots':'CREATE_PLOTS',
+ 'model_name':'MODEL_NAME'
+}
 out=[]
 for k,v in cfg.items():
-    name = k.upper()
-    if v is None:
-        sval = ""
-    elif isinstance(v, bool):
-        sval = "yes" if v else "no"
-    else:
-        sval = str(v)
-    # escape single quotes
-    sval = sval.replace("'", "'\"'\"'")
-    out.append(f"__CFG_{name}='{sval}'")
+    if k in keys and v is not None:
+        # quote safely
+        s = str(v).replace("'", "'\"'\"'")
+        out.append(f"{keys[k]}='{s}'")
 print("\n".join(out))
 PY
-)
-    # handle parse errors
-    for l in "${__CFG_LINES[@]}"; do
-        if [[ "$l" == ERROR_PARSING_CONFIG:* ]]; then
-            echo "Failed to parse config: ${l#ERROR_PARSING_CONFIG:}" >&2
-            exit 1
-        fi
-    done
-
-    # evaluate lines to set __CFG_* variables
-    for l in "${__CFG_LINES[@]}"; do
-        eval "$l"
-    done
-
-    # helper to copy config values into script vars only when unset
-    set_from_cfg_if_unset() {
-        local varname="$1" cfgvar="__CFG_${2:-$1}"
-        if [[ -n "${!cfgvar:-}" && -z "${!varname:-}" ]]; then
-            eval "$varname=\"\${$cfgvar}\""
-        fi
-    }
-
-    # map config keys -> script variables (only set if CLI did not set
-    # them)
-    set_from_cfg_if_unset DATA_DIR DATA_DIR
-    set_from_cfg_if_unset CATALOG CATALOG
-    set_from_cfg_if_unset MODEL_CKPT MODEL_CKPT
-    set_from_cfg_if_unset MODEL MODEL
-    set_from_cfg_if_unset OUTPUT_BASE OUTPUT_BASE
-    set_from_cfg_if_unset PLOT_DIR PLOT_DIR
-    set_from_cfg_if_unset GLOBAL_STATS GLOBAL_STATS
-    set_from_cfg_if_unset NORM NORM
-    set_from_cfg_if_unset NORM_PROC NORM_PROC
-    set_from_cfg_if_unset BAND_ORDER BAND_ORDER
-    set_from_cfg_if_unset CROP_TO_GEOMETRY CROP_TO_GEOMETRY
-    set_from_cfg_if_unset MPS_MODE MPS_MODE
-    set_from_cfg_if_unset CREATE_PLOTS CREATE_PLOTS
-    set_from_cfg_if_unset LOG_FILE LOG_FILE
-    set_from_cfg_if_unset DRY_RUN DRY_RUN
+  )"
 fi
 
-# ==================== Validation ====================
-if [[ -z "${DATA_DIR:-}" || -z "${CATALOG:-}" || -z "${MODEL_CKPT:-}"
-]]; then
-    echo "❌ Missing required arguments (either via CLI or config)."
-    echo "Provide -d <data_dir> -c <catalog> -m <model_ckpt> or supply"
-    echo "them in the config file."
-    exit 1
+# Validate required inputs
+if [[ -z "${DATA_DIR}" || -z "${CATALOG}" || -z "${MODEL_CKPT}" ]]; then
+  echo "Missing required arguments. Provide -d, -c, -m or include them in config."
+  usage
 fi
 
-# ==================== Derive Model Name ====================
-if [[ -z "${MODEL:-}" ]]; then
-    if [[ "$MODEL_CKPT" == *"/lightning_logs/"* ]]; then
-        MODEL_DIR="${MODEL_CKPT%%/lightning_logs/*}"
-        MODEL=$(basename "$MODEL_DIR")
-    else
-        MODEL=$(
-            basename "$(dirname "$(dirname "$(dirname \
-                "$MODEL_CKPT")")")" 2>/dev/null \
-            || echo "$(basename "$MODEL_CKPT")"
-        )
-    fi
+# determine model name for namespacing
+if [[ -z "${MODEL_NAME}" ]]; then
+  MODEL_NAME=$(basename "$(dirname "$(dirname "$MODEL_CKPT")")" 2>/dev/null || echo "$(basename "$MODEL_CKPT")")
 fi
 
-# Expand paths
-OUTPUT_BASE=$(expand_path "$OUTPUT_BASE")
-PLOT_DIR=$(expand_path "$PLOT_DIR")
-LOG_FILE=$(expand_path "$LOG_FILE")
-DATA_DIR=$(expand_path "$DATA_DIR")
-CATALOG=$(expand_path "$CATALOG")
-MODEL_CKPT=$(expand_path "$MODEL_CKPT")
+# expand paths
+DATA_DIR=$(eval echo "$DATA_DIR")
+CATALOG=$(eval echo "$CATALOG")
+MODEL_CKPT=$(eval echo "$MODEL_CKPT")
+OUTPUT_BASE=$(eval echo "$OUTPUT_BASE")
+PLOT_DIR=$(eval echo "$PLOT_DIR")
+OUT_DIR="${OUTPUT_BASE%/}/${MODEL_NAME}"
+PLOT_OUT_DIR="${PLOT_DIR%/}/${MODEL_NAME}"
 
-# Output dir namespaced by model
-OUTPUT_DIR="${OUTPUT_BASE%/}/${MODEL}"
-mkdir -p "$OUTPUT_DIR" "$(dirname "$LOG_FILE")" "$PLOT_DIR"
+mkdir -p "$OUT_DIR" "$PLOT_OUT_DIR"
 
-# ==================== Build Command ====================
-# Ensure JSON/global-stats is passed as a single argument (quoted)
-CMD=(
-    ftw_ma
-    model
-    predict
-    -c "$CATALOG"
-    -m "$MODEL_CKPT"
-    -o "$OUTPUT_DIR"
-    --path_column
-    window_b
-    --id_column
-    name
-    --normalization_strategy
-    "$NORM"
-    --normalization_stat_procedure
-    "$NORM_PROC"
-)
+# Build command
+CMD=(ftw_ma model predict -c "$CATALOG" -m "$MODEL_CKPT" -o "$OUT_DIR" --path_column window_b --id_column name --normalization_strategy "$NORMALIZATION" --normalization_stat_procedure "$NORMALIZATION_PROC" -d "$DATA_DIR" --overwrite)
 
-if [[ "$GLOBAL_STATS" != "none" && -n "$GLOBAL_STATS" ]]; then
-    CMD+=(--global_stats "$GLOBAL_STATS")
+if [[ -n "${GLOBAL_STATS}" ]]; then
+  CMD+=(--global_stats "$GLOBAL_STATS")
+fi
+if [[ "$CREATE_PLOTS" == "yes" ]]; then
+  CMD+=(--create_plots --plot_output_dir "$PLOT_OUT_DIR")
 fi
 
-CMD+=(
-    -d "$DATA_DIR"
-    --overwrite
-)
+# show and run (or dry-run)
+echo "Command:"
+printf '%q ' "${CMD[@]}"
+echo
+echo "Output dir: $OUT_DIR"
+echo "Plot dir:   $PLOT_OUT_DIR"
 
-if [[ -n "$BAND_ORDER" ]]; then
-    CMD+=(--band_order "$BAND_ORDER")
-fi
-
-if [[ "$CROP_TO_GEOMETRY" =~ ^(yes|true|1)$ ]]; then
-    CMD+=(--crop_to_geometry)
-fi
-
-if [[ "$MPS_MODE" =~ ^(yes|true|1)$ ]]; then
-    CMD+=(--mps_mode)
-fi
-
-CMD+=(--date_column date)
-
-if [[ "$CREATE_PLOTS" =~ ^(yes|true|1)$ ]]; then
-    # attach model namespace to plot output dir
-    CMD+=(--create_plots)
-    CMD+=(--plot_output_dir "${PLOT_DIR%/}/${MODEL}")
-fi
-
-# ==================== Logging (metadata + command only) ============
-TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
-{
-    echo "============================================================"
-    echo "Run started: $TIMESTAMP"
-    echo "Model: $MODEL"
-    echo "Model checkpoint: $MODEL_CKPT"
-    echo "Data directory: $DATA_DIR"
-    echo "Catalog: $CATALOG"
-    echo "Plot output: ${PLOT_DIR%/}/${MODEL}"
-    echo "Create plots: $CREATE_PLOTS"
-    echo "Normalization: $NORM ($NORM_PROC)"
-    echo "Global stats: ${GLOBAL_STATS:-none}"
-    echo "Band order: ${BAND_ORDER:-none}"
-    echo "Crop to geometry: ${CROP_TO_GEOMETRY:-no}"
-    echo "MPS mode: ${MPS_MODE:-no}"
-    echo "Output directory: $OUTPUT_DIR"
-    echo "Dry run: $DRY_RUN"
-    echo "------------------------------------------------------------"
-    echo "Command executed:"
-    printf '%q ' "${CMD[@]}"
-    echo
-    echo "------------------------------------------------------------"
-} >> "$LOG_FILE"
-
-# ==================== Dry Run Mode ====================
 if [[ "$DRY_RUN" == "yes" ]]; then
-    echo "🧪 Dry run mode: command will not be executed."
-    echo "------------------------------------------------------------"
-    printf '%q ' "${CMD[@]}"
-    echo
-    echo "------------------------------------------------------------"
-    {
-        echo "Run finished: $(date +"%Y-%m-%d %H:%M:%S")"
-        echo "Status: DRY-RUN (not executed)"
-        echo "============================================================"
-    } >> "$LOG_FILE"
-    exit 0
+  echo "Dry run; exiting."
+  exit 0
 fi
 
-# ==================== Display Summary ====================
-cat <<EOF
-🚀 Running ftw_ma model predict...
-Model: $MODEL
-Model checkpoint: $MODEL_CKPT
-Data directory: $DATA_DIR
-Catalog: $CATALOG
-Plot output: ${PLOT_DIR%/}/${MODEL}
-Create plots: $CREATE_PLOTS
-Normalization: $NORM ($NORM_PROC)
-Global stats: ${GLOBAL_STATS:-none}
-Band order: ${BAND_ORDER:-none}
-Crop to geometry: ${CROP_TO_GEOMETRY:-no}
-MPS mode: ${MPS_MODE:-no}
-Output directory: $OUTPUT_DIR
-Log file: $LOG_FILE
-EOF
-
-# ==================== Execute (live output to terminal) =============
-# If running under sbatch, environment is already provisioned;
-# otherwise user env is used.
 "${CMD[@]}"
 RC=$?
-
-# ==================== Log result (status only) =======================
-if [[ $RC -eq 0 ]]; then
-    {
-        echo "Run finished: $(date +"%Y-%m-%d %H:%M:%S")"
-        echo "Status: SUCCESS (rc=0)"
-        echo "============================================================"
-    } >> "$LOG_FILE"
-    echo "✅ Run completed successfully."
-else
-    {
-        echo "Run finished: $(date +"%Y-%m-%d %H:%M:%S")"
-        echo "Status: FAILURE (rc=$RC)"
-        echo "============================================================"
-    } >> "$LOG_FILE"
-    echo "❌ Run failed (rc=$RC). See terminal output for details."
-fi
-
-echo "✅ Prediction complete. Log updated: $LOG_FILE"
 exit $RC
