@@ -142,7 +142,7 @@ def build_and_write_mosaic(
 
     out_cog.parent.mkdir(parents=True, exist_ok=True)
 
-   # ---------------------------------------------------------------
+# ---------------------------------------------------------------
 # Write to COG (triggers computation)
 # ---------------------------------------------------------------
 log.info("Writing COG...")
