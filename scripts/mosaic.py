@@ -136,9 +136,13 @@ def build_and_write_mosaic(
     # ---------------------------------------------------------------
     # Prepare for COG writing
     # ---------------------------------------------------------------
-    # Remove _FillValue to prevent xarray encoding conflicts
+    # Remove _FillValue from attrs and encoding to prevent xarray conflicts
     if "_FillValue" in mosaic.attrs:
         del mosaic.attrs["_FillValue"]
+
+    for var in mosaic.data_vars if isinstance(mosaic, xr.Dataset) else [mosaic]:
+        if "_FillValue" in var.encoding:
+            del var.encoding["_FillValue"]
 
     # Ensure nodata is properly set
     if src_nodata is not None:
