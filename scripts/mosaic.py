@@ -8,6 +8,7 @@ Example:
     python mosaic.py --in-dir ./tiles --out-cog ./mosaic.tif
         --required-crs EPSG:4326 --cog-compress ZSTD --cog-blocksize 2048
         --force-tr 0.0001 0.0001 --workers 4 --threads-per-worker 2
+        --dry-run
 """
 
 import argparse
@@ -82,6 +83,7 @@ def build_and_write_mosaic(
     chunksize=2048,
     workers=1,
     threads_per_worker=1,
+    dry_run=False,
 ):
     # ---------------------------------------------------------------
     # Setup
@@ -131,7 +133,14 @@ def build_and_write_mosaic(
     log.info("Building mosaic (lazy merge)...")
     mosaic = merge_arrays(arrays, method="first")
 
-    # Apply nodata if specified
+    # ---------------------------------------------------------------
+    # Prepare for COG writing
+    # ---------------------------------------------------------------
+    # Remove _FillValue to prevent xarray encoding conflicts
+    if "_FillValue" in mosaic.attrs:
+        del mosaic.attrs["_FillValue"]
+
+    # Ensure nodata is properly set
     if src_nodata is not None:
         try:
             nodata_val = float(src_nodata)
@@ -142,38 +151,98 @@ def build_and_write_mosaic(
 
     out_cog.parent.mkdir(parents=True, exist_ok=True)
 
-# ---------------------------------------------------------------
-# Write to COG (triggers computation)
-# ---------------------------------------------------------------
-log.info("Writing COG...")
+    # Dry-run mode: skip actual write
+    if dry_run:
+        log.info("[dry-run] Mosaic prepared, skipping COG write.")
+        log.info(f"[dry-run] Tiles: {len(tiles)}, Target CRS: {target_crs}")
+        if client:
+            client.close()
+            cluster.close()
+        return
 
-# Remove _FillValue to prevent xarray encoding conflict
-if "_FillValue" in mosaic.attrs:
-    del mosaic.attrs["_FillValue"]
+    # ---------------------------------------------------------------
+    # Write to COG (triggers computation)
+    # ---------------------------------------------------------------
+    log.info("Writing COG...")
+    with ProgressBar():
+        mosaic.rio.to_raster(
+            str(out_cog),
+            driver="COG",
+            compress=cog_compress,
+            BLOCKSIZE=int(cog_blocksize),
+            PREDICTOR=int(cog_predictor),
+            BIGTIFF="IF_SAFER",
+            OVERVIEWS=cog_overviews,
+            RESAMPLING="NEAREST",
+            NUM_THREADS=cog_threads,
+        )
 
-# Ensure nodata is properly set
-if src_nodata is not None:
-    try:
-        nodata_val = float(src_nodata)
-    except ValueError:
-        nodata_val = None
-    if nodata_val is not None:
-        mosaic = mosaic.rio.write_nodata(nodata_val, inplace=False)
+    log.info(f"COG written successfully: {out_cog}")
 
-with ProgressBar():
-    mosaic.rio.to_raster(
-        str(out_cog),
-        driver="COG",
-        compress=cog_compress,
-        BLOCKSIZE=int(cog_blocksize),
-        PREDICTOR=int(cog_predictor),
-        BIGTIFF="IF_SAFER",
-        OVERVIEWS=cog_overviews,
-        RESAMPLING="NEAREST",
-        NUM_THREADS=cog_threads,
+    if client:
+        client.close()
+        cluster.close()
+
+
+# -------------------------------------------------------------------------
+# CLI
+# -------------------------------------------------------------------------
+def main(argv):
+    p = argparse.ArgumentParser(
+        description="Build mosaic COG from tiles (Dask + rioxarray version)"
+    )
+    p.add_argument("--in-dir", "-i", required=True, 
+                   help="Input directory with tiles")
+    p.add_argument("--out-cog", "-o", required=True, 
+                   help="Output COG path")
+    p.add_argument("--pattern", default="*.tif", 
+                   help="Glob pattern for tiles")
+    p.add_argument("--required-crs", default="EPSG:4326", 
+                   help="Assign CRS only if missing")
+    p.add_argument("--src-nodata", default="255", 
+                   help="Source nodata value")
+    p.add_argument("--cog-compress", default="ZSTD", 
+                   help="COG compression (ZSTD, LZW, DEFLATE)")
+    p.add_argument("--cog-blocksize", default="2000", 
+                   help="COG blocksize")
+    p.add_argument("--cog-predictor", default="2", help="COG predictor")
+    p.add_argument("--cog-overviews", default="AUTO", 
+                   help="COG overviews option")
+    p.add_argument("--cog-threads", default="ALL_CPUS", 
+                   help="COG threads option")
+    p.add_argument("--force-tr", nargs=2, type=float, metavar=("TRX", "TRY"), 
+                   help="Force resolution (tr x tr)")
+    p.add_argument("--force-tap", action="store_true", help="Force tap option " 
+                   "(ignored, placeholder)")
+    p.add_argument("--force-srs", help="Force SRS (e.g. EPSG:4326)")
+    p.add_argument("--chunksize", type=int, default=2048, 
+                   help="Dask chunk size (pixels)")
+    p.add_argument("--workers", type=int, default=1, help="Dask workers")
+    p.add_argument("--threads-per-worker", type=int, default=1, 
+                   help="Threads per Dask worker")
+    p.add_argument("--dry-run", action="store_true", 
+                   help="Do everything except actually write the COG")
+
+    args = p.parse_args(argv)
+    build_and_write_mosaic(
+        in_dir=Path(args.in_dir),
+        out_cog=Path(args.out_cog),
+        pattern=args.pattern,
+        required_crs=args.required_crs,
+        force_tr=tuple(args.force_tr) if args.force_tr else None,
+        force_srs=args.force_srs,
+        src_nodata=args.src_nodata,
+        cog_compress=args.cog_compress,
+        cog_blocksize=args.cog_blocksize,
+        cog_predictor=args.cog_predictor,
+        cog_overviews=args.cog_overviews,
+        cog_threads=args.cog_threads,
+        chunksize=args.chunksize,
+        workers=args.workers,
+        threads_per_worker=args.threads_per_worker,
+        dry_run=args.dry_run,
     )
 
-log.info(f"COG written successfully: {out_cog}")
 
 if __name__ == "__main__":
     main(sys.argv[1:])
