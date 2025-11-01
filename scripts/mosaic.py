@@ -42,21 +42,44 @@ def run_cmd(cmd, desc=None):
 
 def _ensure_gdal_binaries():
     """Ensure GDAL CLI tools are on PATH; try common locations if not found."""
-    required = ("gdalbuildvrt", "gdal_translate", "gdal_edit.py")
-    missing = [c for c in required if shutil.which(c) is None]
-    if not missing:
+    # look for core tools; gdal_edit may be named differently on some installs
+    required_core = ("gdalbuildvrt", "gdal_translate")
+    edit_candidates = ("gdal_edit.py", "gdal_edit", "gdal_edit.py3")
+
+    missing_core = [c for c in required_core if shutil.which(c) is None]
+    found_edit = next((c for c in edit_candidates if shutil.which(c)), None)
+    if not missing_core and found_edit:
+        # everything present
+        # expose chosen edit command globally for later use
+        global GDAL_EDIT_CMD
+        GDAL_EDIT_CMD = found_edit
         return
+
     # try common locations (add any site-specific paths here)
-    common_dirs = ["/opt/software/usr/bin", "/usr/local/bin", "/usr/bin", 
-                   "/opt/local/bin", os.path.expanduser("~/.local/bin")]
+    common_dirs = [
+        "/opt/software/usr/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/opt/local/bin",
+        os.path.expanduser("~/.local/bin"),
+    ]
     for d in common_dirs:
         if os.path.isdir(d):
-            # prepend to PATH and re-check
             os.environ["PATH"] = f"{d}:{os.environ.get('PATH','')}"
-            missing = [c for c in required if shutil.which(c) is None]
-            if not missing:
+            missing_core = [c for c in required_core if shutil.which(c) is None]
+            found_edit = next((c for c in edit_candidates \
+                               if shutil.which(c)), None)
+            if not missing_core and found_edit:
+                global GDAL_EDIT_CMD
+                GDAL_EDIT_CMD = found_edit
                 return
-    # still missing -> raise with hints
+
+    # still missing -> build helpful message
+    missing = []
+    missing.extend([c for c in required_core if shutil.which(c) is None])
+    if not found_edit:
+        missing.append("gdal_edit (any variant)")
+
     hints = [
         f"Missing GDAL CLI tools: {', '.join(missing)}",
         "",
@@ -66,8 +89,8 @@ def _ensure_gdal_binaries():
         "  On clusters: load the module, e.g. module load gdal/3.x",
         "",
         "If GDAL is already installed in a non-standard location, set PATH or",
-        "export GDAL_BIN_DIR=/path/to/gdal/bin and re-run; this script will "
-        "try common locations including /opt/software/usr/bin.",
+        "export GDAL_BIN_DIR=/path/to/gdal/bin and re-run; this script tries",
+        "common locations including /opt/software/usr/bin.",
         "",
         "Example:",
         "  export PATH=/opt/software/usr/bin:$PATH",
