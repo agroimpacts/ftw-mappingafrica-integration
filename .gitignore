@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Data and results
+data/
+*.csv
+*.tsv
+*.parquet
+*.h5
+*.hdf5
+*.npy
+*.npz
+
+# Environment
+.env
+.venv/
+env/
+venv/
+*.env
+
+# Mac OS
+.DS_Store
+
+# Test, coverage, and cache
+.coverage
+.cache/
+*.cover
+htmlcov/
+*.pytest_cache/
+*.mypy_cache/
+*.pylint.d/
+*.tox/
+*.coverage.*
+
+# Others
+*.bak
+*.swp
+*.tmp
+*.orig
+*.qgz
+*detritus*
+*README_files*
+.Rproj.user
+*external/results*
