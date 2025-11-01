@@ -17,6 +17,9 @@ import shutil
 import os
 import textwrap
 
+# Default edit command (may be overridden by _ensure_gdal_binaries)
+GDAL_EDIT_CMD = "gdal_edit.py"
+
 
 def tile_has_crs(path: Path) -> bool:
     try:
@@ -49,10 +52,8 @@ def _ensure_gdal_binaries():
     missing_core = [c for c in required_core if shutil.which(c) is None]
     found_edit = next((c for c in edit_candidates if shutil.which(c)), None)
     if not missing_core and found_edit:
-        # everything present
-        # expose chosen edit command globally for later use
-        global GDAL_EDIT_CMD
-        GDAL_EDIT_CMD = found_edit
+        # everything present — expose chosen edit command for later use
+        globals()["GDAL_EDIT_CMD"] = found_edit
         return
 
     # try common locations (add any site-specific paths here)
@@ -67,11 +68,9 @@ def _ensure_gdal_binaries():
         if os.path.isdir(d):
             os.environ["PATH"] = f"{d}:{os.environ.get('PATH','')}"
             missing_core = [c for c in required_core if shutil.which(c) is None]
-            found_edit = next((c for c in edit_candidates \
-                               if shutil.which(c)), None)
+            found_edit = next((c for c in edit_candidates if shutil.which(c)), None)
             if not missing_core and found_edit:
-                global GDAL_EDIT_CMD
-                GDAL_EDIT_CMD = found_edit
+                globals()["GDAL_EDIT_CMD"] = found_edit
                 return
 
     # still missing -> build helpful message
@@ -173,8 +172,9 @@ def main(argv):
     for tf in tqdm(tiles, desc="CRS check", unit="file"):
         if not tile_has_crs(tf):
             # assign CRS metadata only (no pixel transform)
+            edit_cmd = globals().get("GDAL_EDIT_CMD", "gdal_edit.py")
             run_cmd(
-                ["gdal_edit.py", "-a_srs", required_crs, str(tf)],
+                [edit_cmd, "-a_srs", required_crs, str(tf)],
                 desc=f"Assigning CRS {required_crs} to {tf}",
             )
 
