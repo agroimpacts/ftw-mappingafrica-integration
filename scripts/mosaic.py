@@ -13,6 +13,9 @@ import argparse
 import sys
 import rasterio
 from tqdm.auto import tqdm
+import shutil
+import os
+import textwrap
 
 
 def tile_has_crs(path: Path) -> bool:
@@ -37,8 +40,46 @@ def run_cmd(cmd, desc=None):
         raise RuntimeError(msg)
     return proc.stdout
 
+def _ensure_gdal_binaries():
+    """Ensure GDAL CLI tools are on PATH; try common locations if not found."""
+    required = ("gdalbuildvrt", "gdal_translate", "gdal_edit.py")
+    missing = [c for c in required if shutil.which(c) is None]
+    if not missing:
+        return
+    # try common locations (add any site-specific paths here)
+    common_dirs = ["/opt/software/usr/bin", "/usr/local/bin", "/usr/bin", 
+                   "/opt/local/bin", os.path.expanduser("~/.local/bin")]
+    for d in common_dirs:
+        if os.path.isdir(d):
+            # prepend to PATH and re-check
+            os.environ["PATH"] = f"{d}:{os.environ.get('PATH','')}"
+            missing = [c for c in required if shutil.which(c) is None]
+            if not missing:
+                return
+    # still missing -> raise with hints
+    hints = [
+        f"Missing GDAL CLI tools: {', '.join(missing)}",
+        "",
+        "Install or enable GDAL:",
+        "  macOS (Homebrew): brew install gdal",
+        "  Conda (recommended): conda install -c conda-forge gdal",
+        "  On clusters: load the module, e.g. module load gdal/3.x",
+        "",
+        "If GDAL is already installed in a non-standard location, set PATH or",
+        "export GDAL_BIN_DIR=/path/to/gdal/bin and re-run; this script will "
+        "try common locations including /opt/software/usr/bin.",
+        "",
+        "Example:",
+        "  export PATH=/opt/software/usr/bin:$PATH",
+        "  python scripts/mosaic.py --in-dir ./tiles --out-cog ./mosaic.tif",
+    ]
+    raise RuntimeError("\n".join(textwrap.wrap("\n".join(hints), width=9999)))
+
 
 def main(argv):
+    # ensure GDAL CLI available (this will try /opt/software/usr/bin etc)
+    _ensure_gdal_binaries()
+
     p = argparse.ArgumentParser(
         description="Build mosaic COG from tiles (uses GDAL CLI tools)."
     )
