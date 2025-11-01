@@ -136,22 +136,27 @@ def build_and_write_mosaic(
     # ---------------------------------------------------------------
     # Prepare for COG writing
     # ---------------------------------------------------------------
-    # Remove _FillValue from attrs and encoding to prevent xarray conflicts
+    # Remove _FillValue from attrs and encoding to prevent conflicts
     if "_FillValue" in mosaic.attrs:
         del mosaic.attrs["_FillValue"]
-
     for var in mosaic.data_vars if isinstance(mosaic, xr.Dataset) else [mosaic]:
-        if "_FillValue" in var.encoding:
-            del var.encoding["_FillValue"]
+        var.encoding.pop("_FillValue", None)
+        var.encoding.pop("dtype", None)
 
     # Ensure nodata is properly set
+    nodata_val = None
     if src_nodata is not None:
         try:
             nodata_val = float(src_nodata)
         except ValueError:
             nodata_val = None
-        if nodata_val is not None:
-            mosaic = mosaic.rio.write_nodata(nodata_val, inplace=False)
+
+    if nodata_val is not None:
+        # Promote dtype if needed
+        current_dtype = mosaic.dtype
+        if nodata_val > 127 and "int8" in str(current_dtype):
+            mosaic = mosaic.astype("uint8")
+        mosaic = mosaic.rio.write_nodata(nodata_val, inplace=False)
 
     out_cog.parent.mkdir(parents=True, exist_ok=True)
 
