@@ -59,3 +59,4 @@ htmlcov/
 *README_files*
 .Rproj.user
 *external/results*
+external/catalogs/*
