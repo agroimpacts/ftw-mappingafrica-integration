@@ -2,7 +2,7 @@ trainer:
   max_epochs: 400
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ~/working/models/unet-effb7-ltfl-mnmx_gab-sta-longcat
+  default_root_dir: ~/working/models/unet-effb7-ltfl-mmgab-sta-ep400-longcat
   devices: [0]
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
