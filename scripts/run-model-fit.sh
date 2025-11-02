@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --gpus-per-task=1
 #SBATCH --mem=64G
-#SBATCH --time=24:00:00
+#SBATCH --time=120:00:00
 #SBATCH --job-name=ftw-train
 
 # === Dynamic paths ===
