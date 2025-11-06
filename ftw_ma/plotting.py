@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import rasterio
 from typing import Tuple, Optional, Union
+import argparse
+from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -660,9 +662,12 @@ def create_batch_plots(
 
         # Save plot with batch number and experiment prefix
         mode_suffix = "with_gt" if has_ground_truth else "pred_only"
+        now = datetime.now()
+        minutes = now.hour * 60 + now.minute
+        date_str = f"{now.strftime('%Y%j')}{minutes:04d}"
         output_file = output_dir / (
-            f'{file_prefix}inference_comparison_{mode_suffix}'
-            f'_batch_{batch_idx + 1:03d}.png'
+            f"{file_prefix}inf_{mode_suffix}_"
+            f"{date_str}_b{batch_idx + 1:03d}.png"
         )
         plt.savefig(output_file, dpi=150, bbox_inches='tight')
         plt.close()
@@ -670,7 +675,6 @@ def create_batch_plots(
 
 def main():
     """Main function for standalone script execution."""
-    import argparse
     
     parser = argparse.ArgumentParser(
         description='Visualize inference results vs ground truth'

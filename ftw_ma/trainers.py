@@ -77,8 +77,10 @@ class CustomSemanticSegmentationTask(BaseTask):
             num_classes: Number of prediction classes.
             num_filters: Number of filters. Only applicable when model='fcn'.
             loss: Name of the loss function, currently supports
-                'ce', 'jaccard', 'focal' loss, and modified for various 
-                tverskys.
+                'ce', 'jaccard', 'focal', 'dice', and 'logcoshdice' loss, and 
+                various tversky and tversky focal losses: 'tverskyfocal', 
+                'tverskyfocalce', 'localtversky', 'localtverskyce', 
+                'tversky' (tversky index)
             class_weights: Optional rescaling weight given to each
                 class and used with 'ce' loss.
             ignore_index: Optional integer class index to ignore in the loss and
@@ -135,14 +137,6 @@ class CustomSemanticSegmentationTask(BaseTask):
             self.criterion = smp.losses.FocalLoss(
                 "multiclass", ignore_index=ignore_index, normalized=True
             )
-        elif loss == "localtversky":
-            self.criterion = LocallyWeightedTverskyFocalLoss(
-                ignore_index=ignore_index
-            )
-        elif loss == "tversky":  # smp Tversky
-            self.criterion = smp.losses.TverskyLoss(
-                "multiclass", ignore_index=ignore_index
-            )
         elif loss == "dice":
             self.criterion = smp.losses.DiceLoss(
                 "multiclass", ignore_index=ignore_index
@@ -154,13 +148,34 @@ class CustomSemanticSegmentationTask(BaseTask):
                 class_weights=class_weights,
                 ignore_index=ignore_index
             )
+        elif loss == "tversky":  # smp Tversky Index
+            self.criterion = smp.losses.TverskyLoss(
+                "multiclass", ignore_index=ignore_index
+            )
+        elif loss == "tverskyfocal": 
+            self.criterion = TverskyFocalLoss(
+                ignore_index=ignore_index
+            )
+        elif loss == "tverskyfocalce": 
+            self.criterion = TverskyFocalCELoss(
+                ignore_index=ignore_index
+            )            
+        elif loss == "localtversky":
+            self.criterion = LocallyWeightedTverskyFocalLoss(
+                ignore_index=ignore_index
+            )
+        elif loss == "localtverskyce":
+            self.criterion = LocallyWeightedTverskyFocalCELoss(
+                ignore_index=ignore_index
+            )            
         else:
             raise ValueError(
                 f"Loss type '{loss}' is not valid. "
-                "Currently, supports 'ce', 'jaccard', 'focal', 'localtversky',"
-                " 'tversky', 'dice', and 'logcoshdice'."
+                "Currently, supports 'ce', 'jaccard', 'focal', " \
+                "'tversky', 'dice', and 'logcoshdice', " \
+                "'tverskyfocalce', 'tverskyfocalce', 'localtversky', " \
+                "'localtverskyce'."
             )
-        # self.criterion = SafeLossWrapper(self.criterion)
 
     def configure_metrics(self) -> None:
         """Initialize the performance metrics."""
