@@ -157,7 +157,12 @@ class CustomSemanticSegmentationTask(BaseTask):
                 ignore_index=ignore_index
             )
         elif loss == "tverskyfocalce": 
+            if self.hparams["class_weights"] is not None:
+                class_weights = torch.tensor(self.hparams["class_weights"])
+            else:
+                class_weights = None
             self.criterion = TverskyFocalCELoss(
+                loss_weight=class_weights, 
                 ignore_index=ignore_index
             )            
         elif loss == "localtversky":
