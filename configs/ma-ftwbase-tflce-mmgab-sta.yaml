@@ -15,7 +15,7 @@ trainer:
 model:
   class_path: ftw_ma.trainers.CustomSemanticSegmentationTask
   init_args:
-    class_weights: null
+    class_weights: [0.05, 0.2, 0.75]
     loss: tverskyfocalce
     model: unet
     backbone: efficientnet-b3
