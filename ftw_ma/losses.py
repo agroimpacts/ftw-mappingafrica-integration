@@ -31,25 +31,10 @@ class BinaryTverskyFocalLoss(nn.Module):
 
         tversky_index = (tp + self.smooth) / (
             tp + self.alpha * fn + self.beta * fp + self.smooth
-)
+        )
         return torch.pow(1 - tversky_index, 1 / self.gamma)
 
 
-class TverskyFocalLoss(nn.Module):
-    """
-    Focal Tversky loss compatible with SMP Loss API.
-
-    Args:
-        mode (str): "binary" or "multiclass"
-        from_logits (bool): whether inputs are raw logits
-        smooth (float): smoothing constant
-        alpha (float): weight for false negatives
-        gamma (float): focal exponent (>1 amplifies hard examples)
-        weight (Tensor, optional): class weights [num_classes]
-        ignore_index (int): index to ignore in target
-        reduction (str): "mean" or "sum"
-    """
-    
 class TverskyFocalLoss(nn.Module):
     def __init__(self, mode="multiclass", from_logits=True,
                  smooth=1.0, alpha=0.7, gamma=1.33,
@@ -160,7 +145,7 @@ class TverskyFocalCELoss(nn.Module):
                                          device=predict.device)
             elif isinstance(self.loss_weight, torch.Tensor):
                 ce_weight = self.loss_weight.to(device=predict.device,
-                                               dtype=torch.float32)
+                                                dtype=torch.float32)
         ce = nn.CrossEntropyLoss(weight=ce_weight, 
                                  ignore_index=self.ignore_index)
         return self.tversky_weight * tversky(predict, target) + \
