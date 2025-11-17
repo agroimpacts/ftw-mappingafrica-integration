@@ -7,7 +7,7 @@ trainer:
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
-        monitor: val_loss
+        monitor: val/loss
         mode: min
         save_top_k: 1
         save_last: true
@@ -35,12 +35,12 @@ data:
     num_workers: 8
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
-    catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-catalog-long2.csv
+    catalog: ~/projects/ftw-mappingafrica-integration/data/mappingafrica-catalog.csv
     normalization_strategy: min_max
     normalization_stat_procedure: gab
     random_shuffle: false
     global_stats:
-      min: [68.4]
-      max: [5772.3]
+      min: [203.5]
+      max: [4590.4]
     img_clip_val: 0
 seed_everything: 7
