@@ -2,13 +2,13 @@ trainer:
   max_epochs: 100
   log_every_n_steps: 10
   accelerator: "cuda"
-  default_root_dir: ~/working/models/ftw1-unet-effb7-ltfl-mmgab-sta-ep100
+  default_root_dir: ~/working/models/unet-effb3-ce
   devices:
     - 0
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
       init_args:
-        monitor: val_loss
+        monitor: val/loss
         mode: min
         save_top_k: 1
         save_last: true
@@ -18,9 +18,9 @@ model:
   class_path: ftw_ma.trainers.CustomSemanticSegmentationTask
   init_args:
     class_weights: [0.05, 0.2, 0.75]
-    loss: "localtversky"
+    loss: "ce" # "focal", "dice", "localtversky"
     model: unet
-    backbone: efficientnet-b7
+    backbone: efficientnet-b3
     weights: true
     patch_weights : false
     in_channels: 4
@@ -39,11 +39,15 @@ data:
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
     catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-catalog2.csv
-    normalization_strategy: min_max
-    normalization_stat_procedure: gab
-    random_shuffle: false
+    normalization_strategy: z_value
+    normalization_stat_procedure: gpb
     global_stats:
-      min: [68.4]
-      max: [5772.3]
+      mean: [0, 0, 0, 0]
+      std: [3000, 3000, 3000, 3000]
     img_clip_val: 0
+    aug_list:
+      - rotation
+      - hflip
+      - vflip
+      - sharpness
 seed_everything: 7
