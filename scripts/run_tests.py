@@ -65,25 +65,37 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     home_dir = Path.home()
     cfg_path = Path(model)
     
-    # If model is a path to a config file, extract the model name
+    # If model is a path to a config file, extract info
     if cfg_path.suffix == ".yaml":
-        # Use the stem (filename without extension) as model name (flattened)
-        model_name = cfg_path.stem
+        model_name = cfg_path.stem  # For output filenames
         config_file = cfg_path
+        # Preserve relative directory structure for checkpoint lookup
+        if cfg_path.is_absolute():
+            # Use just the stem for absolute paths
+            checkpoint_subpath = model_name
+        else:
+            # For relative paths like "configs/1timepoint/model.yaml"
+            # strip the .yaml and use the parent path
+            checkpoint_subpath = cfg_path.with_suffix("").as_posix()
+            # Remove "configs/" prefix if present
+            if checkpoint_subpath.startswith("configs/"):
+                checkpoint_subpath = checkpoint_subpath[8:]
     else:
-        # model is just a name, build the config path
-        model_name = model
+        # model is just a name or a subpath like "1timepoint/model-name"
+        model_name = Path(model).name  # Just the filename part
+        checkpoint_subpath = model
         config_file = Path("configs") / f"{model}.yaml"
     
     if not config_file.exists():
         print(f"❌ Config file not found: {config_file}")
         return
 
-    # Use only the model_name (stem) for checkpoint lookup, not the full path
-    model_dir = home_dir / "working" / "models" / model_name
+    # Use checkpoint_subpath to preserve directory structure
+    model_dir = home_dir / "working" / "models" / checkpoint_subpath
     version_num = find_latest_version(model_dir)
     if version_num is None:
-        print(f"❌ No version dirs found for {model_name}.")
+        print(f"❌ No version dirs found for {checkpoint_subpath}.")
+        print(f"   Expected checkpoint dir: {model_dir}")
         return
 
     checkpoint_dir = (
@@ -91,7 +103,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     )
     checkpoint_file = find_checkpoint(checkpoint_dir)
     if checkpoint_file is None:
-        print(f"❌ No checkpoints found for {model_name}.")
+        print(f"❌ No checkpoints found in {checkpoint_dir}")
         return
 
     catalog_path = expand_path(catalog)
