@@ -67,7 +67,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     
     # If model is a path to a config file, extract the model name
     if cfg_path.suffix == ".yaml":
-        # Use the stem (filename without extension) as model name
+        # Use the stem (filename without extension) as model name (flattened)
         model_name = cfg_path.stem
         config_file = cfg_path
     else:
@@ -79,6 +79,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
         print(f"❌ Config file not found: {config_file}")
         return
 
+    # Use only the model_name (stem) for checkpoint lookup, not the full path
     model_dir = home_dir / "working" / "models" / model_name
     version_num = find_latest_version(model_dir)
     if version_num is None:
