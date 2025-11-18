@@ -66,23 +66,18 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     cfg_path = Path(model)
     
     # If model is a path to a config file, extract info
-    if cfg_path.suffix == ".yaml":
-        model_name = cfg_path.stem  # For output filenames
+    if cfg_path.suffix == ".yaml" or "/" in model:
+        # It's already a path (relative or absolute)
         config_file = cfg_path
-        # Preserve relative directory structure for checkpoint lookup
-        if cfg_path.is_absolute():
-            # Use just the stem for absolute paths
-            checkpoint_subpath = model_name
-        else:
-            # For relative paths like "configs/1timepoint/model.yaml"
-            # strip the .yaml and use the parent path
-            checkpoint_subpath = cfg_path.with_suffix("").as_posix()
-            # Remove "configs/" prefix if present
-            if checkpoint_subpath.startswith("configs/"):
-                checkpoint_subpath = checkpoint_subpath[8:]
+        model_name = cfg_path.stem  # For output filenames
+        
+        # For checkpoint lookup, strip "configs/" prefix and .yaml suffix
+        checkpoint_subpath = cfg_path.with_suffix("").as_posix()
+        if checkpoint_subpath.startswith("configs/"):
+            checkpoint_subpath = checkpoint_subpath[8:]  # Remove "configs/"
     else:
-        # model is just a name or a subpath like "1timepoint/model-name"
-        model_name = Path(model).name  # Just the filename part
+        # model is just a name like "ftwbaseline-exp1"
+        model_name = model
         checkpoint_subpath = model
         config_file = Path("configs") / f"{model}.yaml"
     
