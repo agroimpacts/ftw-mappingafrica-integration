@@ -64,17 +64,25 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     """Run ftw_ma test on catalog subsets by country."""
     home_dir = Path.home()
     cfg_path = Path(model)
-    if cfg_path.suffix != ".yaml":
-        cfg_path = Path("configs") / f"{model}.yaml"
-    if not cfg_path.exists():
-        print(f"❌ Config file not found: {cfg_path}")
+    
+    # If model is a path to a config file, extract the model name
+    if cfg_path.suffix == ".yaml":
+        # Use the stem (filename without extension) as model name
+        model_name = cfg_path.stem
+        config_file = cfg_path
+    else:
+        # model is just a name, build the config path
+        model_name = model
+        config_file = Path("configs") / f"{model}.yaml"
+    
+    if not config_file.exists():
+        print(f"❌ Config file not found: {config_file}")
         return
-    config_file = cfg_path
 
-    model_dir = home_dir / "working" / "models" / model
+    model_dir = home_dir / "working" / "models" / model_name
     version_num = find_latest_version(model_dir)
     if version_num is None:
-        print(f"❌ No version dirs found for {model}.")
+        print(f"❌ No version dirs found for {model_name}.")
         return
 
     checkpoint_dir = (
@@ -82,7 +90,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     )
     checkpoint_file = find_checkpoint(checkpoint_dir)
     if checkpoint_file is None:
-        print(f"❌ No checkpoints found for {model}.")
+        print(f"❌ No checkpoints found for {model_name}.")
         return
 
     catalog_path = expand_path(catalog)
@@ -98,7 +106,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     output_dir = home_dir / "working" / "models" / "results"
     output_dir.mkdir(parents=True, exist_ok=True)
     catalog_base = catalog_path.stem
-    combined_path = output_dir / f"{model}-{catalog_base}-{split}-combined.csv"
+    combined_path = output_dir / f"{model_name}-{catalog_base}-{split}-combined.csv"
 
     # Determine countries to loop over
     if countries is None:
@@ -136,7 +144,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
         except Exception:
             pass
 
-        print(f"🌍 Testing {model} on {country} ({len(subset_df)} rows)")
+        print(f"🌍 Testing {model_name} on {country} ({len(subset_df)} rows)")
 
         cmd = [
             "ftw_ma", "model", "test",
@@ -178,7 +186,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
                 print("ftw_ma stderr:", proc.stderr.strip())
                 continue
 
-            out_df["model"] = model
+            out_df["model"] = model_name
             out_df["country"] = (country if country != "all" else "ALL")
 
             summaries.append(out_df)
@@ -186,10 +194,12 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
         except subprocess.CalledProcessError as e:
             # print captured output to help debugging
             stdout = (
-                e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+                e.stdout.decode() if isinstance(e.stdout, bytes) 
+                else (e.stdout or "")
             )
             stderr = (
-                e.stderr.decode() if isinstance(e.stderr, bytes) else (e.stderr or "")
+                e.stderr.decode() if isinstance(e.stderr, bytes) 
+                else (e.stderr or "")
             )
             print(f"❌ {country} failed (exit {e.returncode})")
             if stdout:
@@ -215,7 +225,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     else:
         print("⚠️ No summaries produced; nothing written.")
 
-    print(f"🏁 All subsets done for {model}.")
+    print(f"🏁 All subsets done for {model_name}.")
     print(f"📁 Combined results: {combined_path}")
 
 
