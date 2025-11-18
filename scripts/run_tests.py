@@ -65,9 +65,12 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
     home_dir = Path.home()
     cfg_path = Path(model)
     
-    # If model is a path to a config file, extract info
-    if cfg_path.suffix == ".yaml" or "/" in model:
-        # It's already a path (relative or absolute)
+    # If model contains a path separator, treat it as a path
+    if "/" in model or cfg_path.suffix == ".yaml":
+        # Ensure it has .yaml extension
+        if cfg_path.suffix != ".yaml":
+            cfg_path = cfg_path.with_suffix(".yaml")
+        
         config_file = cfg_path
         model_name = cfg_path.stem  # For output filenames
         
