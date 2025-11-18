@@ -72,12 +72,10 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
             cfg_path = cfg_path.with_suffix(".yaml")
         
         config_file = cfg_path
-        model_name = cfg_path.stem  # For output filenames
+        model_name = cfg_path.stem  # Just the filename without extension
         
-        # For checkpoint lookup, strip "configs/" prefix and .yaml suffix
-        checkpoint_subpath = cfg_path.with_suffix("").as_posix()
-        if checkpoint_subpath.startswith("configs/"):
-            checkpoint_subpath = checkpoint_subpath[8:]  # Remove "configs/"
+        # CHANGED: Use only model_name for checkpoint lookup (flat structure)
+        checkpoint_subpath = model_name
     else:
         # model is just a name like "ftwbaseline-exp1"
         model_name = model
@@ -88,7 +86,7 @@ def run_test(model, catalog, split="validate", countries=None, data_dir=None):
         print(f"❌ Config file not found: {config_file}")
         return
 
-    # Use checkpoint_subpath to preserve directory structure
+    # Use checkpoint_subpath (just model name, not subdirectories)
     model_dir = home_dir / "working" / "models" / checkpoint_subpath
     version_num = find_latest_version(model_dir)
     if version_num is None:
