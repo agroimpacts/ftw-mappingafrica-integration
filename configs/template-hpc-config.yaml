@@ -35,7 +35,7 @@ data:
   init_args:
     temporal_options: windowB
     batch_size: 32
-    num_workers: 8
+    num_workers: 4
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
     catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-catalog2.csv
