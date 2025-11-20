@@ -27,8 +27,6 @@ model:
     ignore_index: 3
     lr: 1e-4
     patience: 50
-    freeze_decoder: true
-    freeze_encoder: true
 data:
   class_path: ftw_ma.datamodule.FTWMapAfricaDataModule
   init_args:
