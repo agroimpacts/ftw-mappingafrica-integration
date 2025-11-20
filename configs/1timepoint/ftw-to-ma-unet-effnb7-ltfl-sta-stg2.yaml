@@ -1,5 +1,5 @@
 trainer:
-  max_epochs: 50
+  max_epochs: 153
   log_every_n_steps: 10
   accelerator: cuda
   default_root_dir: ~/working/models/ftw-to-ma-unet-effnb7-ltfl-sta-stg2
