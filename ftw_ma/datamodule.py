@@ -8,8 +8,6 @@ from lightning import LightningDataModule
 from matplotlib.figure import Figure
 from torch import Tensor
 from torch.utils.data import DataLoader, Subset
-from torchgeo.transforms import SatSlideMix
-# from torchgeo.datamodules import NonGeoDataModule
 from .dataset import FTWMapAfrica
 
 
@@ -30,7 +28,6 @@ class FTWMapAfricaDataModule(LightningDataModule):
         self,
         batch_size: int = 32,
         num_workers: int = 0,
-        aug_list: Optional[list] = None,
         global_stats: Optional[Union[Dict[str, Any], Tuple, List]] = None,
         normalization_strategy: str = "min_max",
         normalization_stat_procedure: str = "gab",
@@ -57,8 +54,6 @@ class FTWMapAfricaDataModule(LightningDataModule):
         
         # ---- normalize inputs BEFORE calling super() ----
         # prefer explicit kwargs over possible duplicates inside kwargs
-        if "aug_list" in kwargs and aug_list is None:
-            aug_list = kwargs.pop("aug_list")
         if "global_stats" in kwargs and global_stats is None:
             global_stats = kwargs.pop("global_stats")
         if "normalization_strategy" in kwargs:
@@ -98,7 +93,6 @@ class FTWMapAfricaDataModule(LightningDataModule):
         print(f"global_stats={global_stats}")
 
         # remove any keys we normalized so parent doesn't get unexpected objects
-        # kwargs.pop("aug_list", None)
         kwargs.pop("global_stats", None)
         kwargs.pop("normalization_strategy", None)
         kwargs.pop("normalization_stat_procedure", None)  
@@ -114,73 +108,6 @@ class FTWMapAfricaDataModule(LightningDataModule):
         self.global_stats = global_stats
         self.normalization_strategy = normalization_strategy
         self.normalization_stat_procedure = normalization_stat_procedure
-        # keep aug_list as provided (None means no augmentations)
-        # self.aug_list = aug_list
-
-        # if not self.aug_list:
-        #     print("No augmentations will be applied.")
-        #     self.train_aug = None
-        #     self.kwargs = kwargs
-        #     return
-
-        # available_augs = {
-        #     # "rotation": K.RandomRotation(p=0.5, degrees=90),
-        #     "rotation": K.RandomRotation(p=0.5, degrees=(90, 90)),
-        #     "hflip": K.RandomHorizontalFlip(p=0.5),
-        #     "vflip": K.RandomVerticalFlip(p=0.5),
-        #     "rescale": K.RandomResizedCrop(
-        #         size=(256, 256),
-        #         scale=(0.3, 0.9), ratio=(0.75, 1.33),
-        #         cropping_mode="slice",
-        #         p=0.5
-        #     ),
-        #     "satslidemix": SatSlideMix(p=0.5),
-        #     "sharpness": K.RandomSharpness(p=0.5),
-        #     "gaussian_noise": K.RandomGaussianNoise(
-        #         mean=0.0, std=0.05, p=0.25
-        #     ),
-        #     "brightness": K.RandomBrightness(brightness=(0.8, 1.5), p=0.5),
-        #     "contrast": K.RandomContrast(contrast=(0.9, 1.2), p=0.25),
-        # }
-        # if self.normalization_strategy == "min_max":
-        #     available_augs["gamma"] = K.RandomGamma(gamma=(0.2, 2.0), p=0.25)
-        
-        # # Define geometric and photometric augmentation names
-        # geometric_augs = ["rotation", "hflip", "vflip", "rescale", 
-        #                   "satslidemix"]
-        # photometric_augs = ["sharpness", "brightness", "contrast", 
-        #                     "gaussian_noise"]
-        
-        # if "gamma" in (self.aug_list or []) \
-        #     and self.normalization_strategy != "min_max":
-        #      print(f"Warning: 'gamma' augmentation requires 'min_max'" \
-        #            f"normalization. Skipping 'gamma'.")            
-
-        # # Build selected_augs in the desired order
-        # # Add geometric augmentations first
-        # selected_augs = []
-        # # Add geometric augmentations first
-        # selected_augs += [available_augs[name] for name in geometric_augs
-        #                   if (self.aug_list and name in self.aug_list) 
-        #                   and name in available_augs]
-        # # Add gamma if present
-        # if (self.aug_list and "gamma" in self.aug_list) \
-        #     and "gamma" in available_augs \
-        #         and self.normalization_strategy == "min_max":
-        #      selected_augs.append(available_augs["gamma"])
-        
-        # # Add photometric augmentations
-        # selected_augs += [available_augs[name] for name in photometric_augs
-        #                   if (self.aug_list and name in self.aug_list) 
-        #                   and name in available_augs]
-
-        # self.train_aug = K.AugmentationSequential(
-        #     *selected_augs, 
-        #     data_keys=None,
-        #     keepdim=True,
-        # )
-        # print(self.train_aug)
-        # self.aug = None  # we just want normalization for val/test
 
         augs = [
             # # If preprocess_aug enabled, replace fixed normalization with random divisor lambda.
@@ -223,7 +150,6 @@ class FTWMapAfricaDataModule(LightningDataModule):
                 normalization_strategy=self.normalization_strategy, 
                 normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
-                # transforms=self.train_aug,
                 **self.kwargs,
             )
         if stage in ["fit", "validate"]:
@@ -232,7 +158,6 @@ class FTWMapAfricaDataModule(LightningDataModule):
                 normalization_strategy=self.normalization_strategy, 
                 normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
-                # transforms=None,
                 **self.kwargs,
             )
         if stage == "test":
@@ -241,7 +166,6 @@ class FTWMapAfricaDataModule(LightningDataModule):
                 normalization_strategy=self.normalization_strategy, 
                 normalization_stat_procedure=self.normalization_stat_procedure,
                 global_stats=self.global_stats,
-                # transforms=None,
                 **self.kwargs,
             )
 
