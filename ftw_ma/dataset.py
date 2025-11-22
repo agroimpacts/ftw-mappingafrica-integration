@@ -13,7 +13,6 @@ import rasterio
 import torch
 from skimage.exposure import rescale_intensity
 from torch import Tensor
-# from torchgeo.datasets.utils import array_to_tensor
 from torchgeo.datasets import NonGeoDataset, RasterDataset
 from .normalize import normalize_image
 
