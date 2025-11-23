@@ -189,7 +189,9 @@ class FTWMapAfrica(NonGeoDataset):
             if m is None:
                 continue
             # only include window_b when temporal option requires it
-            wb_entry = wb if ("windowB" in self.temporal_options) else None
+            # wb_entry = wb if ("windowB" in self.temporal_options) else None
+            wb_entry = wb if self.temporal_options in ("stacked", "windowB") \
+                else None
             all_filenames.append({"window_a": wa, "window_b": wb_entry, 
                                   "mask": m})
 
