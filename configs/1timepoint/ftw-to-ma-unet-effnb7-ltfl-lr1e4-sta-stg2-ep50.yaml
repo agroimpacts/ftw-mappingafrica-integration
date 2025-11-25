@@ -35,7 +35,7 @@ data:
     num_workers: 4
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
-    catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-catalog2.csv
+    catalog: ~/projects/ftw-mappingafrica-integration/data/mappingafrica-catalog.csv
     normalization_strategy: min_max
     normalization_stat_procedure: gab
     random_shuffle: false
