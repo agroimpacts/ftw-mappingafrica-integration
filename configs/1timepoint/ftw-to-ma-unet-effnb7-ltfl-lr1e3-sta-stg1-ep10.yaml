@@ -2,7 +2,7 @@ trainer:
   max_epochs: 110
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ~/working/models/ftw-to-ma-unet-effnb7-ltfl-lr1e3-sta-ep10
+  default_root_dir: ~/working/models/ftw-to-ma-unet-effnb7-ltfl-lr1e3-sta-stg1-ep10
   devices: [0]
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
