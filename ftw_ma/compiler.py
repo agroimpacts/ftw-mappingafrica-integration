@@ -69,7 +69,6 @@ def test(
     data_dir,
     catalog,
     split,
-    temporal_options,
     iou_threshold,
     out,
 ):
@@ -112,7 +111,9 @@ def test(
     global_stats = data_args.get("global_stats", None) 
     img_clip_val = data_args.get("img_clip_val", None)  
     nodata = data_args.get("nodata", None)
+    temporal_options = data_args.get("temporal_options", "windowB")
 
+    print(f"temporal_options: {temporal_options}") 
     print(f"normalization_strategy: {normalization_strategy}")
     print(f"normalization_stat_procedure: {normalization_stat_procedure}")
     print(f"global_stats: {global_stats}")  
