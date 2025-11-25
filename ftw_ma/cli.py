@@ -96,14 +96,14 @@ def model_fit(config, ckpt_path, cli_args):
     show_default=True,
     help="Choose validate or test split",
 )
-@click.option(
-    "--temporal_options",
-    "-t",
-    type=click.Choice(["stacked", "windowA", "windowB"]),
-    default="windowB",
-    show_default=True,
-    help="Temporal option",
-)
+# @click.option(
+#     "--temporal_options",
+#     "-t",
+#     type=click.Choice(["stacked", "windowA", "windowB"]),
+#     default="windowB",
+#     show_default=True,
+#     help="Temporal option",
+# )
 @click.option(
     "--iou_threshold",
     "-iou",
@@ -127,7 +127,6 @@ def model_test(
     data_dir,
     catalog,
     split,
-    temporal_options,
     iou_threshold,
     out,
 ):
@@ -140,7 +139,6 @@ def model_test(
         data_dir,
         catalog,
         split,
-        temporal_options,
         iou_threshold,
         out,
     )
