@@ -53,9 +53,11 @@ class CustomSemanticSegmentationTask(BaseTask):
         patch_weights: bool = False,
         freeze_backbone: bool = False,
         freeze_decoder: bool = False,
+        freeze_encoder_blocks: Optional[list[int]] = None,  
+        freeze_decoder_blocks: Optional[list[int]] = None,  
         model_kwargs: dict[Any, Any] = dict(),
     ) -> None:
-        """Inititalize a new SemanticSegmentationTask instance.
+        """Initialize a new SemanticSegmentationTask instance.
 
         Args:
             model: Name of the
@@ -91,6 +93,10 @@ class CustomSemanticSegmentationTask(BaseTask):
                 decoder and segmentation head.
             freeze_decoder: Freeze the decoder network to linear probe
                 the segmentation head.
+            freeze_encoder_blocks: List of encoder block indices to freeze 
+                (e.g., [0, 1, 2] freezes first 3 blocks). None = no freezing.
+            freeze_decoder_blocks: List of decoder block indices to freeze
+                (e.g., [0, 1] freezes first 2 decoder blocks). None = no freezing.
             model_kwargs: Additional keyword arguments to pass to the model
 
         Warns:
@@ -274,18 +280,49 @@ class CustomSemanticSegmentationTask(BaseTask):
                 "and 'segformer'."
             )
 
-        # Freeze backbone
+        # Load checkpoint weights
+        if isinstance(weights, str) and weights.endswith('.ckpt'):
+            print(f"Loading model weights from checkpoint: {weights}")
+            checkpoint = torch.load(weights, map_location='cpu')
+            state_dict = checkpoint['state_dict']
+            model_state_dict = {
+                k.replace('model.', ''): v
+                for k, v in state_dict.items()
+                if k.startswith('model.')
+            }
+            self.model.load_state_dict(model_state_dict, strict=True)
+            print("Successfully loaded model weights")
+
+        # patch weights (if needed)
+        if patch_weights:
+            self.transfer_weights(self.model, backbone)
+
+        # freeze layers
+        # entire backbone
         if self.hparams["freeze_backbone"] and model in ["unet", "deeplabv3+"]:
             for param in self.model.encoder.parameters():
                 param.requires_grad = False
 
-        # Freeze decoder
+        # Entire decoder
         if self.hparams["freeze_decoder"] and model in ["unet", "deeplabv3+"]:
             for param in self.model.decoder.parameters():
                 param.requires_grad = False
 
-        if patch_weights:
-            self.transfer_weights(self.model, backbone)
+        # Freeze specific encoder blocks
+        if self.hparams["freeze_encoder_blocks"] is not None:
+            for block_idx in self.hparams["freeze_encoder_blocks"]:
+                block = getattr(self.model.encoder, f"layer{block_idx}", None)
+                if block is not None:
+                    for param in block.parameters():
+                        param.requires_grad = False
+
+        # Freeze specific decoder blocks
+        if self.hparams["freeze_decoder_blocks"] is not None:
+            for block_idx in self.hparams["freeze_decoder_blocks"]:
+                block = getattr(self.model.decoder, f"layer{block_idx}", None)
+                if block is not None:
+                    for param in block.parameters():
+                        param.requires_grad = False
 
     def _log_per_class(self, metrics_dict, split: str):
         # metrics_dict like {"precision": tensor(C,), "recall": tensor(C,), 
@@ -405,7 +442,8 @@ class CustomSemanticSegmentationTask(BaseTask):
                         )
                 plt.close()
                 
-    def test_step(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> None:
+    def test_step(self, batch: Any, batch_idx: 
+                  int, dataloader_idx: int = 0) -> None:
         """Compute the test loss and additional metrics.
 
         Args:
@@ -430,7 +468,8 @@ class CustomSemanticSegmentationTask(BaseTask):
         Returns:
             Optimizer and learning rate scheduler.
         """
-        optimizer = AdamW(self.parameters(), lr=self.hparams["lr"], amsgrad=True)
+        optimizer = AdamW(self.parameters(), lr=self.hparams["lr"], 
+                          amsgrad=True)
         scheduler = CosineAnnealingLR(
             optimizer, T_max=self.hparams["patience"], eta_min=1e-6
         )
