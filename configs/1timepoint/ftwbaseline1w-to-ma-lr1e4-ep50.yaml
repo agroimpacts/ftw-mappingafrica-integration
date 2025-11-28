@@ -2,7 +2,7 @@ trainer:
   max_epochs: 50
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ~/working/models/ftwbaseline1w-to-ma-lr1e4-ep50
+  default_root_dir: /u/lestes/working/models/ftwbaseline1w-to-ma-lr1e4-ep50
   devices: [0]
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
@@ -19,7 +19,7 @@ model:
     loss: localtversky
     model: unet
     backbone: efficientnet-b7
-    weights: ~/working/models/baselines/ftw-unet-effnb7-ltfl-sta-ep100.ckpt
+    weights: /u/lestes/working/models/baselines/ftw-unet-effnb7-ltfl-sta-ep100.ckpt
     patch_weights: false
     in_channels: 4
     num_classes: 3
