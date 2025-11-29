@@ -2,7 +2,7 @@ trainer:
   max_epochs: 50
   log_every_n_steps: 10
   accelerator: cuda
-  default_root_dir: ${env:HOME}/working/models/ftwbaseline1w-to-ma-nofrz-lr1e4-ep50
+  default_root_dir: ~/working/models/ftwbaseline1w-to-ma-nofrz-lr1e4-ep50
   devices: [0]
   callbacks:
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
@@ -35,7 +35,7 @@ data:
     num_workers: 4
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
-    catalog: ${env:HOME}/projects/ftw-mappingafrica-integration/data/mappingafrica-catalog.csv
+    catalog: ~/projects/projects/ftw-mappingafrica-integration/data/mappingafrica-catalog.csv
     normalization_strategy: min_max
     normalization_stat_procedure: gab
     random_shuffle: false
