@@ -1,4 +1,6 @@
 import warnings
+import os
+import re
 from typing import Any, Optional, Union
 
 import lightning
@@ -96,7 +98,7 @@ class CustomSemanticSegmentationTask(BaseTask):
             freeze_encoder_blocks: List of encoder block indices to freeze 
                 (e.g., [0, 1, 2] freezes first 3 blocks). None = no freezing.
             freeze_decoder_blocks: List of decoder block indices to freeze
-                (e.g., [0, 1] freezes first 2 decoder blocks). None = no freezing.
+                (e.g., [0, 1] freezes first 2 decoder blocks). None = no freeze.
             model_kwargs: Additional keyword arguments to pass to the model
 
         Warns:
@@ -111,9 +113,30 @@ class CustomSemanticSegmentationTask(BaseTask):
             )
         print(model_kwargs)
         self.class_names = ["background", "field", "boundary", "unknown"]
+        
+        # Expand environment variables in weights path if it's a string
+        if isinstance(weights, str):
+            weights = self._expand_env_vars(weights)
+        
         self.weights = weights
         super().__init__()
         print(self.hparams)
+
+    @staticmethod
+    def _expand_env_vars(path: str) -> str:
+        """Expand ${env:VAR} syntax and ~ in paths."""
+        # Handle ${env:VAR} syntax
+        def replace_env(match):
+            var = match.group(1)
+            value = os.environ.get(var, "")
+            if not value:
+                raise ValueError(f"Environment variable {var} not set")
+            return value
+        
+        path = re.sub(r'\$\{env:(\w+)\}', replace_env, path)
+        # Also expand ~ 
+        path = os.path.expanduser(path)
+        return path
 
     def configure_losses(self) -> None:
         """Initialize the loss criterion.
