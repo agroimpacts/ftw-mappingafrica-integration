@@ -333,19 +333,106 @@ class CustomSemanticSegmentationTask(BaseTask):
 
         # Freeze specific encoder blocks
         if self.hparams["freeze_encoder_blocks"] is not None:
-            for block_idx in self.hparams["freeze_encoder_blocks"]:
-                block = getattr(self.model.encoder, f"layer{block_idx}", None)
-                if block is not None:
-                    for param in block.parameters():
-                        param.requires_grad = False
+            # Check if this is an EfficientNet backbone
+            if "efficientnet" in backbone.lower() or \
+               "effnet" in backbone.lower():
+                # EfficientNet uses model.encoder._blocks
+                if hasattr(self.model.encoder, '_blocks'):
+                    print(
+                        f"Freezing EfficientNet encoder blocks: "
+                        f"{self.hparams['freeze_encoder_blocks']}"
+                    )
+                    for block_idx in self.hparams["freeze_encoder_blocks"]:
+                        if block_idx < len(self.model.encoder._blocks):
+                            print(f"  Freezing block {block_idx}")
+                            for param in self.model.encoder._blocks[
+                                block_idx
+                            ].parameters():
+                                param.requires_grad = False
+                        else:
+                            max_idx = len(self.model.encoder._blocks) - 1
+                            print(
+                                f"  Warning: block {block_idx} does not "
+                                f"exist (max: {max_idx})"
+                            )
+            else:
+                # ResNet-style encoders use layer0, layer1, etc.
+                print(
+                    f"Freezing encoder layers: "
+                    f"{self.hparams['freeze_encoder_blocks']}"
+                )
+                for block_idx in self.hparams["freeze_encoder_blocks"]:
+                    block = getattr(
+                        self.model.encoder, f"layer{block_idx}", None
+                    )
+                    if block is not None:
+                        print(f"  Freezing layer{block_idx}")
+                        for param in block.parameters():
+                            param.requires_grad = False
+                    else:
+                        print(
+                            f"  Warning: layer{block_idx} does not exist"
+                        )
 
         # Freeze specific decoder blocks
         if self.hparams["freeze_decoder_blocks"] is not None:
-            for block_idx in self.hparams["freeze_decoder_blocks"]:
-                block = getattr(self.model.decoder, f"layer{block_idx}", None)
-                if block is not None:
-                    for param in block.parameters():
-                        param.requires_grad = False
+            # Decoder structure varies by model architecture
+            if hasattr(self.model.decoder, '_blocks'):
+                for block_idx in self.hparams["freeze_decoder_blocks"]:
+                    if block_idx < len(self.model.decoder._blocks):
+                        for param in self.model.decoder._blocks[
+                            block_idx
+                        ].parameters():
+                            param.requires_grad = False
+            elif hasattr(self.model.decoder, 'blocks'):
+                for block_idx in self.hparams["freeze_decoder_blocks"]:
+                    if block_idx < len(self.model.decoder.blocks):
+                        for param in self.model.decoder.blocks[
+                            block_idx
+                        ].parameters():
+                            param.requires_grad = False
+            else:
+                for block_idx in self.hparams["freeze_decoder_blocks"]:
+                    block = getattr(
+                        self.model.decoder, f"layer{block_idx}", None
+                    )
+                    if block is not None:
+                        for param in block.parameters():
+                            param.requires_grad = False
+
+        # Check freeze parameters
+        if self.hparams["freeze_encoder_blocks"] is not None:
+            frozen_params = sum(p.numel() 
+                                for p in self.model.encoder.parameters() 
+                                if not p.requires_grad)
+            total_params = sum(p.numel() 
+                               for p in self.model.encoder.parameters())
+            print(
+                f"Encoder: {frozen_params}/{total_params} parameters frozen"\
+                f" ({100*frozen_params/total_params:.1f}%)"
+            )
+        elif self.hparams["freeze_backbone"]:
+            frozen_params = sum(p.numel() 
+                                for p in self.model.encoder.parameters() 
+                                if not p.requires_grad)
+            total_params = sum(p.numel() 
+                               for p in self.model.encoder.parameters())
+            print(
+                f"Encoder (full backbone): {frozen_params}/{total_params} "\
+                f"parameters frozen ({100*frozen_params/total_params:.1f}%)"
+            )
+        
+        if self.hparams["freeze_decoder_blocks"] is not None \
+            or self.hparams["freeze_decoder"]:
+            frozen_params = sum(p.numel() 
+                                for p in self.model.decoder.parameters() 
+                                if not p.requires_grad)
+            total_params = sum(p.numel() 
+                               for p in self.model.decoder.parameters())
+            print(
+                f"Decoder: {frozen_params}/{total_params} parameters frozen"\
+                f" ({100*frozen_params/total_params:.1f}%)"
+            )
 
     def _log_per_class(self, metrics_dict, split: str):
         # metrics_dict like {"precision": tensor(C,), "recall": tensor(C,), 
