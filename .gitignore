@@ -45,3 +45,26 @@ dry_run/
 .vscode/
 .idea/
 
+#-------------------------
+# Superess model
+#-------------------------
+
+scripts/model
+
+# --------------------
+# Local-only experiments (do not commit)
+# --------------------
+.gitignore.LOCAL-BACKUP
+
+# local configs
+configs/*test*.yaml
+configs/*local*.yaml
+configs/*exp*.yaml
+
+# local notebooks
+notebooks/s2_*.ipynb
+
+# one-off helper scripts
+scripts/planet_windowB_footprints_to_geojson.py
+scripts/retry_windowA_parent128_nomask.py
+
