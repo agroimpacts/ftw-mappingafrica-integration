@@ -1,0 +1,46 @@
+trainer:
+  max_epochs: 100
+  log_every_n_steps: 10
+  accelerator: cuda
+  default_root_dir: ~/working/models/full2w-s2srs2sr-unet-effnb7-ltfl-sta-ep100
+  devices: [0]
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: val/loss
+        mode: min
+        save_top_k: 0
+        save_last: true
+        filename: '{epoch}-{val_loss:.2f}'
+model:
+  class_path: ftw_ma.trainers.CustomSemanticSegmentationTask
+  init_args:
+    class_weights: [0.05, 0.2, 0.75]
+    loss: localtversky
+    model: unet
+    backbone: efficientnet-b7
+    weights: true
+    patch_weights: false
+    in_channels: 8
+    num_classes: 3
+    num_filters: 64
+    ignore_index: 3
+    lr: 1e-3
+    patience: 100
+data:
+  class_path: ftw_ma.datamodule.FTWMapAfricaDataModule
+  init_args:
+    temporal_options: stacked
+    batch_size: 32
+    num_workers: 4
+    num_samples: -1
+    data_dir: /home/airg/data/labels/cropland/
+    catalog: ~/projects/ftw-mappingafrica-integration/data/ftw-ma-s2srwina-s2srwinb-combined.csv
+    normalization_strategy: min_max
+    normalization_stat_procedure: gab
+    random_shuffle: true
+    global_stats:
+      min: [88]
+      max: [5758]
+    img_clip_val: 0
+seed_everything: 7
