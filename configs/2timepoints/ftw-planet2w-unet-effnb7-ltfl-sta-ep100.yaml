@@ -21,7 +21,7 @@ model:
     backbone: efficientnet-b7
     weights: true
     patch_weights: false
-    in_channels: 8
+    in_channels: 6
     num_classes: 3
     num_filters: 64
     ignore_index: 3
@@ -40,7 +40,8 @@ data:
     normalization_stat_procedure: gab
     random_shuffle: true
     global_stats:
-      min: [350]
-      max: [4718]
+      min: [56]
+      max: [2214]
     img_clip_val: 0
+    crop_size: 512
 seed_everything: 7
