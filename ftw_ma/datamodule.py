@@ -32,10 +32,11 @@ class FTWMapAfricaDataModule(LightningDataModule):
         normalization_strategy: str = "min_max",
         normalization_stat_procedure: str = "gab",
         random_shuffle: bool = False,
+        crop_size: Optional[Union[int, Tuple[int, int]]] = None,
         **kwargs
     ):
         """
-        Initialize the data module .
+        Initialize the data module.
         Args:
             temporal_options (str): Temporal stacking options.
             num_samples (int): Number of samples to use (-1 for all).
@@ -47,6 +48,10 @@ class FTWMapAfricaDataModule(LightningDataModule):
             normalization_strategy (str): 'z_value' or 'min_max'.
             normalization_stat_procedure (str): Procedure for stats calc, either
                 'lab', 'lpb', 'gab', or 'gpb'.
+            random_shuffle (bool): Enable random channel shuffling.
+            crop_size (int or tuple): Size for RandomResizedCrop. 
+                Can be int (for square) or (height, width) tuple.
+                If None, defaults to (256, 256).
             **kwargs: Additional arguments for FTWMapAfrica.
         """
         if "split" in kwargs:
@@ -60,6 +65,8 @@ class FTWMapAfricaDataModule(LightningDataModule):
             normalization_strategy = kwargs.pop("normalization_strategy")
         if "normalization_stat_procedure" in kwargs:
             normalization_stat_procedure = kwargs.pop("normalization_stat_procedure")
+        if "crop_size" in kwargs:
+            crop_size = kwargs.pop("crop_size")
 
         # normalize global_stats (accept dict/list/tuple)
         if isinstance(global_stats, dict):
@@ -88,14 +95,29 @@ class FTWMapAfricaDataModule(LightningDataModule):
             except Exception:
                 global_stats = None
 
+        # Normalize crop_size
+        if crop_size is None:
+            crop_size = (256, 256)
+        elif isinstance(crop_size, int):
+            crop_size = (crop_size, crop_size)
+        elif isinstance(crop_size, (list, tuple)) and len(crop_size) == 2:
+            crop_size = tuple(crop_size)
+        else:
+            raise ValueError(
+                f"crop_size must be int or (height, width) tuple, "
+                f"got {crop_size}"
+            )
+
         print(f"Using normalization_strategy='{normalization_strategy}', ")
         print(f"normalization_stat_procedure='{normalization_stat_procedure}'")
         print(f"global_stats={global_stats}")
+        print(f"crop_size={crop_size}")
 
         # remove any keys we normalized so parent doesn't get unexpected objects
         kwargs.pop("global_stats", None)
         kwargs.pop("normalization_strategy", None)
-        kwargs.pop("normalization_stat_procedure", None)  
+        kwargs.pop("normalization_stat_procedure", None)
+        kwargs.pop("crop_size", None)
         # print(kwargs)      
         
         # super().__init__(FTWMapAfrica, batch_size, num_workers, **kwargs)
@@ -108,21 +130,19 @@ class FTWMapAfricaDataModule(LightningDataModule):
         self.global_stats = global_stats
         self.normalization_strategy = normalization_strategy
         self.normalization_stat_procedure = normalization_stat_procedure
+        self.crop_size = crop_size
 
         augs = [
-            # # If preprocess_aug enabled, replace fixed normalization with random divisor lambda.
-            # *(
-            #     [kornia.contrib.Lambda(randomDivisorNormalize)]
-            #     if self.preprocess_aug
-            #     else [K.Normalize(mean=self.mean, std=self.std)]
-            # ),
             K.RandomRotation(p=0.5, degrees=(90, 90)),
             K.RandomHorizontalFlip(p=0.5),
             K.RandomVerticalFlip(p=0.5),
             K.RandomSharpness(p=0.5),
             K.RandomBrightness(p=0.5, brightness=(0.5, 1.5)),
             K.RandomResizedCrop(
-                (256, 256), scale=(0.3, 0.9), ratio=(0.75, 1.33), p=0.5
+                size=self.crop_size,
+                scale=(0.3, 0.9),
+                ratio=(0.75, 1.33),
+                p=0.5
             )
         ]
         
