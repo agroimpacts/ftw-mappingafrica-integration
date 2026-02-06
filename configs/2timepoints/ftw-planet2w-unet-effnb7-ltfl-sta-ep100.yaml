@@ -31,7 +31,7 @@ data:
   class_path: ftw_ma.datamodule.FTWMapAfricaDataModule
   init_args:
     temporal_options: stacked
-    batch_size: 32
+    batch_size: 16
     num_workers: 0
     num_samples: -1
     data_dir: /home/airg/data/labels/cropland/
