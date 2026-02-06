@@ -269,7 +269,7 @@ class FTWMapAfrica(NonGeoDataset):
         return sample    
 
     def plot(self, sample: dict[str, Tensor], 
-             suptitle: Optional[str] = None) -> Figure:
+            suptitle: Optional[str] = None) -> Figure:
         """Plot a sample from the dataset.
 
         Args:
@@ -279,14 +279,24 @@ class FTWMapAfrica(NonGeoDataset):
         Returns:
             a matplotlib Figure with the rendered sample
         """
+        # Get total number of channels
+        total_channels = sample["image"].shape[0]
+        
+        # Extract RGB bands for first time window (bands 0, 1, 2)
         img1 = sample["image"][0:3].numpy().transpose(1, 2, 0)
-        # print("Image shape: ", img1.shape)
 
+        img2 = None
         if self.temporal_options == "stacked": 
-            print("Plotting stacked images")
-            img2 = sample["image"][4:7]
-            img2 = img2.numpy().transpose(1, 2, 0)
-            # print("Image shape: ", img2.shape)
+            # Handle different channel configurations
+            if total_channels == 6:
+                # 2 × RGB (3 bands each)
+                img2 = sample["image"][3:6].numpy().transpose(1, 2, 0)
+            elif total_channels == 8:
+                # 2 × 4-band (RGB-NIR), extract RGB from second window
+                img2 = sample["image"][4:7].numpy().transpose(1, 2, 0)
+            else:
+                print(f"Warning: Unexpected channel count {total_channels} for stacked plot")
+                img2 = img1  # Use first image as fallback
 
         mask = sample["mask"].numpy().squeeze()
         num_panels = 3 if self.temporal_options in ("stacked", "rgb") else 2
@@ -298,22 +308,27 @@ class FTWMapAfrica(NonGeoDataset):
         axs = axs.flatten()
         axs[0].imshow(np.clip(img1, 0, 1))
         axs[0].axis("off")
+        axs[0].set_title("Window A (RGB)")
 
         panel_id = 1
-        if self.temporal_options in ("stacked", "rgb"):
+        if self.temporal_options in ("stacked", "rgb") and img2 is not None:
             axs[panel_id].imshow(np.clip(img2, 0, 1))
             axs[panel_id].axis("off")
+            axs[panel_id].set_title("Window B (RGB)")
             axs[panel_id + 1].imshow(mask, vmin=0, vmax=2, cmap="gray")
             axs[panel_id + 1].axis("off")
+            axs[panel_id + 1].set_title("Mask")
             panel_id += 2
         else:
             axs[panel_id].imshow(mask, vmin=0, vmax=2, cmap="gray")
             axs[panel_id].axis("off")
+            axs[panel_id].set_title("Mask")
             panel_id += 1
 
         if "prediction" in sample:
             axs[panel_id].imshow(predictions, vmin=0, vmax=2, cmap="gray")
             axs[panel_id].axis("off")
+            axs[panel_id].set_title("Prediction")
 
         if suptitle is not None:
             plt.suptitle(suptitle)
