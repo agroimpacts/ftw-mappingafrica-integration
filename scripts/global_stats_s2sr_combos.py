@@ -3,19 +3,15 @@
 global_stats_s2sr_combos.py
 
 Compute global band statistics (min, max, mean, std, p1, p2, p98, p99)
-for raster TIFFs coming from:
-  - FTW catalog CSV window columns (window_a/window_b), and/or
-  - one or more directories of .tif/.tiff files (e.g., MA S2 super-res outputs).
-
-This refactor adds "combo runs" to mirror the same 4 stats combinations:
+For raster TIFFs coming from:
+  - FTW catalog CSV window columns (window_a/window_b) and
+  - Directories of .tif/.tiff files. 
 
 1) MA S2SR WINB only
 2) MA S2SR WINA + WINB
 3) FTW WINA+B + MA S2SR WINB only
 4) FTW WINA+B + MA S2SR WINA+B
 
-Example:
-  python global_stats_s2sr_combos.py --run-set all
 """
 
 from __future__ import annotations
@@ -323,7 +319,7 @@ def run_one(name: str, paths: List[str], root_dir: str, bins: int, out_prefix: s
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Compute global band stats for SR combos (MA + FTW).")
 
-    # Your real inputs
+    # inputs
     p.add_argument("--ftw-catalog", default="/home/airg/gessuman/projects/ftw-mappingafrica-integration/data/ftw-catalog.csv")
     p.add_argument("--ftw-windows", nargs="+", default=["window_a", "window_b"])
 
