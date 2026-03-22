@@ -21,7 +21,7 @@ model:
     backbone: efficientnet-b7
     weights: true
     patch_weights: false
-    in_channels: 8
+    in_channels: 4
     num_classes: 3
     num_filters: 64
     ignore_index: 3
