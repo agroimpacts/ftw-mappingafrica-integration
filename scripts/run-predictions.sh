@@ -2,6 +2,7 @@
 # Usage:
 # ./run_predict.sh -d <data_dir> -c <catalog> -m <model_ckpt> \
 #   [-M <model_name>] [-p <plot_output_dir>] [-n norm] [-np norm_proc] \
+#   [-clip <img_clip_val>] \
 #   [-g '{"mean":[...],"std":[...]}'] [-bo <band_order>] [-crop yes/no] \
 #   [-mps yes/no] [-plot yes/no] [--dry-run]
 #
@@ -12,6 +13,7 @@
 #   -m ~/working/models/fullcat-ftwbaseline-exp1/lightning_logs/version_1/\
 #     checkpoints/last.ckpt \
 #   -n z_value -np gpb \
+#   -clip 1 \
 #   -g '{"mean":[0,0,0,0], "std":[3000,3000,3000,3000]}' \
 #   -bo bgr_to_rgb -crop yes -mps yes -plot yes
 
@@ -21,6 +23,7 @@ set -euo pipefail
 MODEL=""
 NORM=${NORM:-"z_value"}
 NORM_PROC=${NORM_PROC:-"gpb"}
+IMG_CLIP_VAL=${IMG_CLIP_VAL:-0}
 OUTPUT_BASE=${OUTPUT_BASE:-"~/working/models/outputs/predictions"}
 PLOT_DIR=${PLOT_DIR:-"~/working/models/outputs/plots"}
 GLOBAL_STATS=${GLOBAL_STATS:-'{"mean":[0,0,0,0], "std":[3000,3000,3000,3000]}'}
@@ -46,6 +49,7 @@ while [[ $# -gt 0 ]]; do
         -p|--plot-dir) PLOT_DIR="$2"; shift 2 ;;
         -n|--norm) NORM="$2"; shift 2 ;;
         -np|--norm-proc) NORM_PROC="$2"; shift 2 ;;
+        -clip|--clip-val) IMG_CLIP_VAL="$2"; shift 2 ;;
         -g|--global-stats) GLOBAL_STATS="$2"; shift 2 ;;
         -bo|--band-order) BAND_ORDER="$2"; shift 2 ;;
         -crop|--crop) CROP_TO_GEOMETRY="$2"; shift 2 ;;
@@ -67,6 +71,12 @@ done
 if [[ -z "${DATA_DIR:-}" || -z "${CATALOG:-}" || -z "${MODEL_CKPT:-}" ]]; then
     echo "❌ Missing required arguments."
     echo "Usage: ./run_predict.sh -d <data_dir> -c <catalog> -m <model_ckpt>"
+    exit 1
+fi
+
+if ! [[ "$IMG_CLIP_VAL" =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+    echo "❌ Invalid img_clip_val: $IMG_CLIP_VAL" >&2
+    echo "Provide a numeric value, for example: -clip 0 or -clip 1" >&2
     exit 1
 fi
 
@@ -103,6 +113,7 @@ CMD=(
     --id_column name
     --normalization_strategy "$NORM"
     --normalization_stat_procedure "$NORM_PROC"
+    --img_clip_val "$IMG_CLIP_VAL"
 )
 
 if [[ "$GLOBAL_STATS" != "none" && -n "$GLOBAL_STATS" ]]; then
@@ -144,6 +155,7 @@ TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
     echo "Plot output: $PLOT_DIR"
     echo "Create plots: $CREATE_PLOTS"
     echo "Normalization: $NORM ($NORM_PROC)"
+    echo "Image clip value: $IMG_CLIP_VAL"
     echo "Global stats: ${GLOBAL_STATS:-none}"
     echo "Band order: ${BAND_ORDER:-none}"
     echo "Crop to geometry: ${CROP_TO_GEOMETRY:-no}"
@@ -182,6 +194,7 @@ Catalog: $CATALOG
 Plot output: $PLOT_DIR
 Create plots: $CREATE_PLOTS
 Normalization: $NORM ($NORM_PROC)
+Image clip value: $IMG_CLIP_VAL
 Global stats: ${GLOBAL_STATS:-none}
 Band order: ${BAND_ORDER:-none}
 Crop to geometry: ${CROP_TO_GEOMETRY:-no}
@@ -209,6 +222,7 @@ else
         echo "============================================================"
     } >> "$LOG_FILE"
     echo "❌ Run failed (rc=$RC). See terminal output for details."
+    exit "$RC"
 fi
 
 echo "✅ Prediction complete. Log updated: $LOG_FILE"
