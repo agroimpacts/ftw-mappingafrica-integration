@@ -60,3 +60,29 @@ htmlcov/
 .Rproj.user
 *external/results*
 external/catalogs/*
+
+# Local backups / scratch
+*.LOCAL-BACKUP
+MNIST/
+
+# Local edited copies
+*_edited.py
+
+# Local experimental configs
+configs/ftwbaseline-photometric-exp5-test.yaml
+configs/template-hpc-config-test.yaml
+configs/test-hpc-config-local.yaml
+
+# Local notebooks
+notebooks/bld-rg.ipynb
+notebooks/retiler_nicfi_v2_tanz_2024.ipynb
+notebooks/s2_dry_run.ipynb
+notebooks/s2_dwnld.ipynb
+notebooks/shape_metrics.ipynb
+notebooks/workbook.ipynb
+notebooks/zhang_suen.ipynb
+
+# Local scripts / scratch
+scripts/model/
+scripts/planet_windowB_footprints_to_geojson.py
+scripts/retry_windowA_parent128_nomask.py
