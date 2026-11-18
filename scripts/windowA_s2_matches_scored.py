@@ -2,18 +2,25 @@
 """
 windowA_s2_matches_scored.py
 
-Find Sentinel-2 matches for "window A" (seasonal pair) for each Planet chip,
-using seasonal pairing rules, multi-tier cloud thresholds, and a scored pick.
+Find Sentinel-2 Window A matches for QC-flagged MappingAfrica chips
+using regional seasonal pairing rules, multi-tier cloud thresholds,
+and scored candidate selection.
 
-Key changes:
-  - WinA must be strictly earlier than WinB (Planet) → enforced in
-    build_season_targets_earlier().
-  - REGION_RULES expanded based on audit (GH-12, NG/ML/BF-4, TZ-8/12, ET-4, ZA/ZM/ZW-6, …).
-  - pick_target_months() is STRICT: only applies explicit rules (no _extended fallback).
-  - Assertion to guarantee WinA < WinB.
+Key features:
+  - Window A must be strictly earlier than Window B (Planet).
+  - Expanded regional seasonal matching rules.
+  - Strict seasonal rule selection without extended fallback.
+  - Scored candidate selection based on seasonal alignment,
+    temporal proximity, and cloud cover.
+
+Input:
+  data/qa/mappingafrica_catalog_badchips.csv
 
 Output:
-  /home/airg/gessuman/projects/ftw-mappingafrica-integration/data/windowA/windowA_s2_matches_scored.csv
+  data/windowA/bad_chips_windowA_s2_matches_scored.csv
+
+Log:
+  data/windowA/bad_chips_windowA_matches_scored_adj.log
 """
 
 from pathlib import Path
