@@ -60,46 +60,105 @@ def load_image(
 
 # ... rest of the dataset.py code remains the same ...
 class SimpleRasterDataset:
-    """A simple dataset that reads raster files directly with rasterio."""
-    
+    """A simple dataset that reads raster files or in-memory image arrays."""
+
     def __init__(
         self,
-        file_path: str,
+        file_path: Optional[str] = None,
+        image_data: Optional[np.ndarray] = None,
+        profile: Optional[Dict[str, Any]] = None,
         normalization_strategy: str = "min_max",
         normalization_stat_procedure: str = "lab",
         global_stats: Optional[Union[Dict[str, Any], Tuple, List]] = None,
         img_clip_val: float = 0,
         nodata: Optional[List] = None,
     ):
-        """Initialize the SimpleRasterDataset."""
+        """Initialize the SimpleRasterDataset.
+
+        Image data can be supplied in one of two ways:
+
+        1. file_path:
+           Read an existing raster from disk.
+
+        2. image_data + profile:
+           Use an image already constructed in memory.
+
+        Exactly one input mode must be used.
+        """
+
         self.file_path = file_path
         self.normalization_strategy = normalization_strategy
         self.normalization_stat_procedure = normalization_stat_procedure
         self.global_stats = global_stats
         self.img_clip_val = img_clip_val
         self.nodata = nodata or [65535]
-        
-        # Read the image and store it
-        with rasterio.open(file_path) as src:
-            self.image_data = src.read()  # Shape: (bands, height, width)
-            self.profile = src.profile
-            self.transform = src.transform
-            self.bounds = src.bounds
-            self.crs = src.crs
-            self.height, self.width = src.height, src.width
-            
-        # print(f"Loaded image: {self.file_path}")
-        # print(f"  Shape: {self.image_data.shape}")
-        # print(f"  Data type: {self.image_data.dtype}")
-        # # Print value range, breaking at 80 characters
-        # print(
-        #     f"  Value range: "
-        #     f"[{self.image_data.min()}, {self.image_data.max()}]"
-        # )
-        # print(f"  CRS: {self.crs}")
-        # print(f"  Bounds: {self.bounds}")
-        
-        # Apply normalization to the full image
+
+        # Prevent ambiguous or missing input
+        if file_path is not None and image_data is not None:
+            raise ValueError(
+                "Provide either file_path or image_data, not both."
+            )
+
+        if file_path is None and image_data is None:
+            raise ValueError(
+                "Either file_path or image_data must be provided."
+            )
+
+        # ------------------------------------------------------------
+        # Existing pre-tiled TIFF mode
+        # ------------------------------------------------------------
+        if file_path is not None:
+            with rasterio.open(file_path) as src:
+                self.image_data = src.read()
+                self.profile = src.profile
+                self.transform = src.transform
+                self.bounds = src.bounds
+                self.crs = src.crs
+                self.height = src.height
+                self.width = src.width
+
+        # ------------------------------------------------------------
+        # New in-memory imagery mode
+        # ------------------------------------------------------------
+        else:
+            if profile is None:
+                raise ValueError(
+                    "profile must be provided when using image_data."
+                )
+
+            self.image_data = image_data
+            self.profile = profile.copy()
+
+            # Validate expected array layout: (bands, height, width)
+            if self.image_data.ndim != 3:
+                raise ValueError(
+                    "image_data must have shape (bands, height, width)."
+                )
+
+            # Ensure profile dimensions match the supplied array
+            if (
+                self.profile["height"] != self.image_data.shape[1]
+                or self.profile["width"] != self.image_data.shape[2]
+            ):
+                raise ValueError(
+                    "profile height/width do not match image_data shape."
+                )
+
+            self.transform = self.profile["transform"]
+            self.crs = self.profile["crs"]
+            self.height = self.profile["height"]
+            self.width = self.profile["width"]
+
+            # Derive geographic bounds from transform and raster dimensions
+            self.bounds = rasterio.transform.array_bounds(
+                self.height,
+                self.width,
+                self.transform,
+            )
+
+        # ------------------------------------------------------------
+        # Shared normalization for both input modes
+        # ------------------------------------------------------------
         self.normalized_image = normalize_image(
             img=self.image_data.astype(np.float32),
             strategy=self.normalization_strategy,
@@ -108,16 +167,16 @@ class SimpleRasterDataset:
             clip_val=self.img_clip_val,
             nodata=self.nodata,
         )
-        
+
         print(
             f"Normalized image range: "
             f"[{self.normalized_image.min():.2f}, "
             f"{self.normalized_image.max():.2f}]"
         )
-    
+
     def get_full_image(self):
         """Get the full normalized image as a tensor.
-        
+
         Returns:
             torch.Tensor: Full image as tensor (C, H, W)
         """

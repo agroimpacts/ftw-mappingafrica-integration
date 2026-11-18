@@ -162,9 +162,55 @@ def model_test(
     help="Output directory for predictions"
 )
 @click.option(
-    "--data_dir", "-d", required=True,
+    "--data_dir", "-d",
+    required=False,
     type=click.Path(exists=True),
-    help="Base directory containing the image files"
+    default=None,
+    help="Base directory containing image files; required for pre_tiled mode"
+)
+
+@click.option(
+    "--imagery_mode",
+    type=click.Choice(["pre_tiled", "on_the_fly"]),
+    default="pre_tiled",
+    show_default=True,
+    help="Imagery input mode."
+)
+
+@click.option(
+    "--quad_index",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Source imagery quad index GeoParquet for on-the-fly mode."
+)
+
+@click.option(
+    "--buffered_grid",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Buffered 2048x2048 tile grid for on-the-fly mode."
+)
+
+@click.option(
+    "--target_country",
+    type=str,
+    default=None,
+    help="Target country used for source-quad selection."
+)
+
+@click.option(
+    "--year",
+    type=int,
+    default=None,
+    help="Imagery year for on-the-fly mode."
+)
+
+@click.option(
+    "--tile_column",
+    type=str,
+    default="tile",
+    show_default=True,
+    help="Tile ID column shared by catalog and buffered grid."
 )
 @click.option(
     "--path_column", default="window_b", show_default=True,
@@ -271,7 +317,10 @@ def model_test(
     help="Number of images per plot batch"
 )
 def model_predict(
-    catalog, model, output, data_dir, path_column, id_column, split,
+    catalog, model, output, data_dir,
+    imagery_mode, quad_index, buffered_grid,
+    target_country, year, tile_column,
+    path_column, id_column, split,
     normalization_strategy, normalization_stat_procedure, img_clip_val,
     global_stats, nodata, band_order, gpu,
     save_scores, overwrite, crop_to_geometry, geometry_column, mps_mode,
@@ -348,7 +397,43 @@ def model_predict(
 
     # Load catalog - handle both CSV and spatial formats
     catalog_path = Path(catalog)
-    data_dir_path = Path(data_dir)  # Add this line
+
+    if imagery_mode == "pre_tiled":
+        if data_dir is None:
+            raise click.BadParameter(
+                "--data_dir is required when --imagery_mode=pre_tiled"
+            )
+        data_dir_path = Path(data_dir)
+
+    elif imagery_mode == "on_the_fly":
+        if quad_index is None:
+            raise click.BadParameter(
+                "--quad_index is required when --imagery_mode=on_the_fly"
+            )
+
+        if buffered_grid is None:
+            raise click.BadParameter(
+                "--buffered_grid is required when --imagery_mode=on_the_fly"
+            )
+
+        if target_country is None:
+            raise click.BadParameter(
+                "--target_country is required when --imagery_mode=on_the_fly"
+            )
+
+        if year is None:
+            raise click.BadParameter(
+                "--year is required when --imagery_mode=on_the_fly"
+            )
+
+        data_dir_path = None
+
+    else:
+        raise click.BadParameter(
+            f"Unsupported imagery_mode: {imagery_mode}"
+        )
+
+    print(f"Imagery mode: {imagery_mode}")
 
     print(f"Loading catalog: {catalog}")
 
@@ -382,11 +467,84 @@ def model_predict(
         print(f"Filtered to {len(df)} rows for split '{split}'")
 
     # Validate required columns
-    if path_column not in df.columns:
-        available_cols = list(df.columns)
-        raise click.BadParameter(
-            f"Column '{path_column}' not found in catalog. "
-            f"Available columns: {available_cols}"
+    if imagery_mode == "pre_tiled":
+        if path_column not in df.columns:
+            available_cols = list(df.columns)
+            raise click.BadParameter(
+                f"Column '{path_column}' not found in catalog. "
+                f"Available columns: {available_cols}"
+            )
+
+    elif imagery_mode == "on_the_fly":
+        if not is_geodataframe:
+            raise click.BadParameter(
+                "On-the-fly imagery requires a spatial catalog "
+                "such as GeoJSON, GeoPackage, or Shapefile."
+            )
+
+        if tile_column not in df.columns:
+            available_cols = list(df.columns)
+            raise click.BadParameter(
+                f"Tile column '{tile_column}' not found in catalog. "
+                f"Available columns: {available_cols}"
+            )
+
+    # Prepare on-the-fly imagery resources once
+    buffered_grid_gdf = None
+    quad_index_obj = None
+
+    if imagery_mode == "on_the_fly":
+        from .quad_index import QuadIndex
+
+        print(f"Loading buffered tile grid: {buffered_grid}")
+        buffered_grid_gdf = gpd.read_file(buffered_grid)
+
+        if tile_column not in buffered_grid_gdf.columns:
+            raise click.BadParameter(
+                f"Tile column '{tile_column}' not found in buffered grid. "
+                f"Available columns: {list(buffered_grid_gdf.columns)}"
+            )
+
+        if buffered_grid_gdf.crs is None:
+            raise click.BadParameter(
+                "Buffered grid has no CRS."
+            )
+
+        if df.crs is None:
+            raise click.BadParameter(
+                "Prediction catalog has no CRS."
+            )
+
+        if buffered_grid_gdf.crs != df.crs:
+            print(
+                f"Reprojecting buffered grid from "
+                f"{buffered_grid_gdf.crs} to {df.crs}"
+            )
+            buffered_grid_gdf = buffered_grid_gdf.to_crs(df.crs)
+
+        if buffered_grid_gdf[tile_column].duplicated().any():
+            duplicates = buffered_grid_gdf.loc[
+                buffered_grid_gdf[tile_column].duplicated(keep=False),
+                tile_column,
+            ].unique()
+
+            raise click.BadParameter(
+                f"Buffered grid contains duplicate tile IDs. "
+                f"Examples: {list(duplicates[:10])}"
+            )
+
+        # Fast tile-ID lookup during the prediction loop
+        buffered_grid_gdf = buffered_grid_gdf.set_index(
+            tile_column,
+            drop=False,
+        )
+
+        print(f"Loading quad index: {quad_index}")
+        quad_index_obj = QuadIndex(quad_index)
+
+        print(
+            f"On-the-fly resources ready: "
+            f"{len(buffered_grid_gdf)} buffered tiles"
         )
 
     if id_column and id_column not in df.columns:
@@ -419,17 +577,25 @@ def model_predict(
         num_workers = 1
     
     # Process files
+
+    if imagery_mode == "on_the_fly" and num_workers > 1:
+        raise click.BadParameter(
+            "--imagery_mode=on_the_fly currently requires --num_workers 1"
+        )
+
     if num_workers > 1 and device.type == 'cpu':
         # Parallel processing for CPU
         from concurrent.futures import ProcessPoolExecutor
+
         results = _process_files_parallel(
-            df, data_dir_path, output_dir, model, device, 
+            df, data_dir_path, output_dir, model, device,
             parsed_global_stats, parsed_nodata, parsed_band_order,
             num_workers, path_column, id_column, save_scores,
-            normalization_strategy, normalization_stat_procedure, 
-            img_clip_val, overwrite, crop_to_geometry, geometry_column, 
+            normalization_strategy, normalization_stat_procedure,
+            img_clip_val, overwrite, crop_to_geometry, geometry_column,
             is_geodataframe, date_column, date_format
         )
+
     else:
         # Sequential processing (default for GPU/MPS)
         results = _process_files_sequential(
@@ -438,7 +604,9 @@ def model_predict(
             path_column, id_column, save_scores, normalization_strategy,
             normalization_stat_procedure, img_clip_val, overwrite,
             crop_to_geometry, geometry_column, is_geodataframe,
-            date_column, date_format
+            date_column, date_format,
+            imagery_mode, buffered_grid_gdf, quad_index_obj,
+            year, target_country, tile_column
         )
 
     # Save results summary (moved out of functions to avoid duplication)
@@ -530,11 +698,12 @@ def _extract_experiment_name_from_model(model_path: Path) -> str:
 def _process_files_sequential(
         df, data_dir_path, output_dir, model_net, device,
         parsed_global_stats, parsed_nodata, parsed_band_order,
-        path_column, id_column, save_scores, 
+        path_column, id_column, save_scores,
         normalization_strategy, normalization_stat_procedure,
-        img_clip_val, overwrite, crop_to_geometry, 
-        geometry_column, is_geodataframe, date_column, 
-        date_format
+        img_clip_val, overwrite, crop_to_geometry,
+        geometry_column, is_geodataframe, date_column,
+        date_format, imagery_mode, buffered_grid_gdf,
+        quad_index_obj, year, target_country, tile_column
     ):
     """Process files sequentially (original implementation)."""
     from .inference import inference_run_single
@@ -549,24 +718,52 @@ def _process_files_sequential(
     
     for idx, row in df.iterrows():
         try:
-            # Get file path
-            file_path = row[path_column]
-            if pd.isna(file_path):
-                print(f"Skipping row {idx}: missing file path")
-                continue
+            # Resolve imagery input according to selected mode
+            file_path = None
+            full_path = None
+            buffered_geom = None
 
-            # Resolve full path
-            full_path = data_dir_path / file_path
-            if not full_path.exists():
-                print(f"Warning: File not found: {full_path}")
-                results.append({
-                    'row_index': idx,
-                    'file_path': str(file_path),
-                    'full_path': str(full_path),
-                    'success': False,
-                    'error': 'File not found'
-                })
-                continue
+            if imagery_mode == "pre_tiled":
+                file_path = row[path_column]
+
+                if pd.isna(file_path):
+                    print(f"Skipping row {idx}: missing file path")
+                    continue
+
+                full_path = data_dir_path / file_path
+
+                if not full_path.exists():
+                    print(f"Warning: File not found: {full_path}")
+                    results.append({
+                        'row_index': idx,
+                        'file_path': str(file_path),
+                        'full_path': str(full_path),
+                        'success': False,
+                        'error': 'File not found'
+                    })
+                    continue
+
+            elif imagery_mode == "on_the_fly":
+                tile_id = row[tile_column]
+
+                if pd.isna(tile_id):
+                    print(f"Skipping row {idx}: missing tile ID")
+                    continue
+
+                if tile_id not in buffered_grid_gdf.index:
+                    print(
+                        f"Warning: Tile {tile_id} not found in buffered grid"
+                    )
+                    results.append({
+                        'row_index': idx,
+                        'tile': tile_id,
+                        'success': False,
+                        'error': 'Tile not found in buffered grid'
+                    })
+                    continue
+
+                buffered_row = buffered_grid_gdf.loc[tile_id]
+                buffered_geom = buffered_row.geometry
 
             # Get crop geometry if requested
             crop_geom = None
@@ -606,7 +803,11 @@ def _process_files_sequential(
                 
             output_file = output_dir / output_filename
 
-            print(f"Processing {file_id}: {file_path}")
+            if imagery_mode == "pre_tiled":
+                print(f"Processing {file_id}: {file_path}")
+            else:
+                print(f"Processing tile {file_id} on the fly")
+
             if crop_geom is not None:
                 # Access the bounds from the geometry, not the GeoSeries
                 geom_bounds = crop_geom.iloc[0].bounds
@@ -616,7 +817,11 @@ def _process_files_sequential(
 
             # Run inference
             success = inference_run_single(
-                input_file=str(full_path),
+                input_file=(
+                    str(full_path)
+                    if imagery_mode == "pre_tiled"
+                    else None
+                ),
                 model_net=model_net,
                 device=device,
                 out=str(output_file),
@@ -629,13 +834,27 @@ def _process_files_sequential(
                 overwrite=overwrite,
                 band_order=parsed_band_order,
                 crop_geometry=crop_geom,
+                imagery_mode=imagery_mode,
+                tile_geometry=buffered_geom,
+                year=year,
+                target_country=target_country,
+                quad_index=quad_index_obj,
             )
 
             results.append({
                 'row_index': idx,
                 'file_id': file_id,
-                'file_path': str(file_path),
-                'full_path': str(full_path),
+                'tile': row[tile_column] if imagery_mode == "on_the_fly" else None,
+                'file_path': (
+                    str(file_path)
+                    if imagery_mode == "pre_tiled"
+                    else None
+                ),
+                'full_path': (
+                    str(full_path)
+                    if imagery_mode == "pre_tiled"
+                    else None
+                ),
                 'output_path': str(output_file),
                 'success': success,
                 'cropped': crop_geom is not None
@@ -645,7 +864,10 @@ def _process_files_sequential(
                 crop_status = " (cropped)" if crop_geom is not None else ""
                 print(f"  ✓ Success: {output_filename}{crop_status}")
             else:
-                print(f"  ✗ Failed: {file_path}")
+                if imagery_mode == "pre_tiled":
+                    print(f"  ✗ Failed: {file_path}")
+                else:
+                    print(f"  ✗ Failed tile: {row[tile_column]}")
 
         except Exception as e:
             print(f"  ✗ Error processing row {idx}: {e}")
