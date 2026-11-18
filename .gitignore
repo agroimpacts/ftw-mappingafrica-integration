@@ -18,15 +18,17 @@ build/
 .vscode/
 *.code-workspace
 
-# Data and results
-data/
-*.csv
-*.tsv
-*.parquet
-*.h5
-*.hdf5
-*.npy
-*.npz
+# Ignore working datasets and generated results by default.
+data/*
+
+# Version-controlled reference datasets.
+!data/boundaries/
+data/boundaries/*
+!data/boundaries/africa_countries_50m.gpkg
+
+!data/quad_index/
+data/quad_index/*
+!data/quad_index/planet_combined_quad_index_cleaned.parquet
 
 # Environment
 .env
