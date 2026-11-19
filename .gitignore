@@ -1,0 +1,50 @@
+# --------------------
+# Python
+# --------------------
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+.env
+
+# --------------------
+# Jupyter
+# --------------------
+.ipynb_checkpoints/
+
+# --------------------
+# Data & Outputs (DO NOT COMMIT)
+# --------------------
+data/
+**/*.tif
+**/*.tiff
+*.tif
+*.tiff
+*.npy
+*.npz
+
+# --------------------
+# Model artifacts
+# --------------------
+checkpoints/
+lightning_logs/
+
+# --------------------
+# Logs & temp
+# --------------------
+logs/
+tmp/
+scratch/
+dry_run/
+
+# --------------------
+# OS / editor junk
+# --------------------
+.DS_Store
+.vscode/
+.idea/
+
+
+# Pytest cache
+.pytest_cache/
